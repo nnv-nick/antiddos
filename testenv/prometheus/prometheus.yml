@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: postfix
+    static_configs:
+      - targets: ["postfix-exporter:9154"]
+
+  - job_name: legit-sender
+    static_configs:
+      - targets: ["legit-sender:9155"]
+
+  - job_name: attacker
+    static_configs:
+      - targets: ["attacker:9156"]

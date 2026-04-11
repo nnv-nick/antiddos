@@ -1,0 +1,145 @@
+networks:
+  mail:
+    driver: bridge
+
+services:
+
+  # ---------- Mail sink (принимает всё, ничего не хранит) ----------
+  smtp-sink:
+    image: ubuntu/postfix:latest
+    # используем smtp-sink из пакета postfix-dev / postfix
+    # собираем минимальный образ с smtp-sink бинарём
+    build:
+      context: ./smtp-sink
+    container_name: smtp-sink
+    networks:
+      - mail
+    ports:
+      - "2526:2525"   # только для отладки снаружи
+    restart: unless-stopped
+
+  # ---------- Postfix (тестируемый сервер) ----------
+  postfix:
+    build:
+      context: ./postfix
+    container_name: postfix
+    hostname: mail.test.local
+    networks:
+      - mail
+    ports:
+      - "2525:25"     # снаружи для отладки
+    volumes:
+      - ./postfix/main.cf:/etc/postfix/main.cf:ro
+      - ./postfix/master.cf:/etc/postfix/master.cf:ro
+      - postfix-logs:/var/log
+    cpus: "1.0"
+    mem_limit: 512m
+    restart: unless-stopped
+    depends_on:
+      - smtp-sink
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 25 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ---------- Postfix log exporter -> Prometheus ----------
+  postfix-exporter:
+    build:
+      context: ../
+      dockerfile: testenv/postfix-exporter/Dockerfile
+    container_name: postfix-exporter
+    networks:
+      - mail
+    volumes:
+      - postfix-logs:/var/log:ro
+    command:
+      - "--postfix.logfile_path=/var/log/mail.log"
+      - "--web.listen-address=:9154"
+    depends_on:
+      - postfix
+    restart: unless-stopped
+
+  # ---------- Prometheus ----------
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: prometheus
+    networks:
+      - mail
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+
+  # ---------- Grafana ----------
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    networks:
+      - mail
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ---------- Legit sender ----------
+  legit-sender:
+    build:
+      context: ../
+      dockerfile: testenv/legit-sender/Dockerfile
+    container_name: legit-sender
+    networks:
+      - mail
+    ports:
+      - "9155:9155"   # Prometheus metrics
+    environment:
+      SMTP_HOST: postfix
+      SMTP_PORT: "25"
+      FROM_ADDR: legit@sender.test
+      TO_ADDR: user@test.local
+      RATE_PER_SEC: "2"        # писем в секунду при нормальной работе
+      METRICS_ADDR: ":9155"
+    depends_on:
+      postfix:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------- Attacker ----------
+  attacker:
+    build:
+      context: ../
+      dockerfile: testenv/attacker/Dockerfile
+    container_name: attacker
+    networks:
+      - mail
+    ports:
+      - "9156:9156"   # Prometheus metrics
+    environment:
+      SMTP_HOST: postfix
+      SMTP_PORT: "25"
+      METRICS_ADDR: ":9156"
+    volumes:
+      - ./scenarios:/scenarios:ro
+    # сценарий передаётся при запуске через docker compose run attacker /scenarios/s1.yaml
+    command: ["--scenario", "/scenarios/baseline.yaml"]
+    cpus: "1.5"     # 4 CPU в VM: 1.0 postfix + 1.5 attacker + 1.5 остальным
+    profiles:
+      - attack    # не стартует автоматически, запускается вручную
+    depends_on:
+      - postfix
+
+volumes:
+  postfix-logs:
+  prometheus-data:
+  grafana-data:

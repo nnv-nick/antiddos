@@ -1,0 +1,20 @@
+# A1 — connection_flood с одного IP.
+# Простейшая атака: один источник открывает много соединений.
+# Легко блокируется per-IP лимитом — baseline здесь справляется нормально.
+name: a1_connection_flood_single
+description: >
+  Флуд соединениями с одного IP-адреса.
+  Ожидаем: статик-per-IP лимит помогает, PDR остаётся высоким.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: attack
+    duration: 120s
+    attack:
+      type: connection_flood
+      workers: 20
+      rate_per_sec: 0   # максимально быстро

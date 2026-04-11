@@ -1,0 +1,19 @@
+# A2 — junk_session: спам невалидными командами внутри сессии.
+# Злоумышленник подключается и шлёт NOOP/VRFY в цикле, не отпуская сессию.
+name: a2_junk_session
+description: >
+  Атака через засорение сессий невалидными SMTP-командами.
+  Проверяем влияние smtpd_junk_command_limit и smtpd_hard_error_limit.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: junk_attack
+    duration: 120s
+    attack:
+      type: junk_session
+      workers: 20
+      junk_commands_per_session: 15

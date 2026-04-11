@@ -1,0 +1,18 @@
+# Go binaries
+/postfix-exporter
+
+# Python virtualenv (testenv/report/)
+testenv/report/bin/
+testenv/report/lib/
+testenv/report/include/
+testenv/report/share/
+testenv/report/pyvenv.cfg
+
+# Report outputs
+testenv/report/results/
+
+# macOS
+.DS_Store
+
+.claude/
+memory/

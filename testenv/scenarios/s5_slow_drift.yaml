@@ -1,0 +1,57 @@
+# S5 — "Медленный дрейф": интенсивность атаки плавно нарастает.
+#
+# Почему это интересно:
+#   Статик с фиксированным порогом "замечает" атаку только когда
+#   она уже набрала силу. Динамика отслеживает rate-of-change
+#   и начинает реагировать раньше.
+name: s5_slow_drift
+description: >
+  Постепенный рост интенсивности: 5 фаз по 2 минуты,
+  workers растут с 2 до 30. Имитирует "ботнет, который
+  постепенно добавляет узлы".
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: drift_1_very_low
+    duration: 120s
+    attack:
+      type: connection_flood
+      workers: 2
+      rate_per_sec: 2
+
+  - name: drift_2_low
+    duration: 120s
+    attack:
+      type: connection_flood
+      workers: 5
+      rate_per_sec: 5
+
+  - name: drift_3_medium
+    duration: 120s
+    attack:
+      type: connection_flood
+      workers: 10
+      rate_per_sec: 0
+
+  - name: drift_4_high
+    duration: 120s
+    attack:
+      type: connection_flood
+      workers: 20
+      rate_per_sec: 0
+
+  - name: drift_5_max
+    duration: 120s
+    attack:
+      type: connection_flood
+      workers: 30
+      rate_per_sec: 0
+
+  - name: recovery
+    duration: 60s
+    attack:
+      type: no_attack

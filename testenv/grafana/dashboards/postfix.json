@@ -1,0 +1,128 @@
+{
+  "title": "Postfix AntiDDoS — Overview",
+  "uid": "postfix-antiddos",
+  "schemaVersion": 38,
+  "refresh": "5s",
+  "time": { "from": "now-10m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "PDR — Protected Delivery Rate (%)",
+      "description": "Доля доставленных легитимных писем. Главная метрика.",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "100 * rate(legit_sender_delivered_total[30s]) / (rate(legit_sender_sent_total[30s]) + 0.001)",
+          "legendFormat": "PDR %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 70 },
+              { "color": "green", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Legit — отправлено / доставлено / отклонено (msg/s)",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(legit_sender_sent_total[30s])",
+          "legendFormat": "sent"
+        },
+        {
+          "expr": "rate(legit_sender_delivered_total[30s])",
+          "legendFormat": "delivered"
+        },
+        {
+          "expr": "rate(legit_sender_rejected_total[30s])",
+          "legendFormat": "rejected"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Legit — задержка доставки (p50 / p95)",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(legit_sender_latency_seconds_bucket[30s]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(legit_sender_latency_seconds_bucket[30s]))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Postfix — rejected connections / messages (rate)",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(postfix_smtpd_connects_total[30s])",
+          "legendFormat": "connects/s"
+        },
+        {
+          "expr": "rate(postfix_smtpd_disconnects_total[30s])",
+          "legendFormat": "disconnects/s"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Attacker — соединений и писем в секунду",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(attacker_connections_total[30s])",
+          "legendFormat": "connections/s"
+        },
+        {
+          "expr": "rate(attacker_messages_total[30s])",
+          "legendFormat": "messages/s"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "PDR последние 30 сек",
+      "gridPos": { "x": 12, "y": 16, "w": 6, "h": 8 },
+      "targets": [
+        {
+          "expr": "100 * rate(legit_sender_delivered_total[30s]) / (rate(legit_sender_sent_total[30s]) + 0.001)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 70 },
+              { "color": "green", "value": 90 }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

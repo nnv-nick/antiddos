@@ -1,0 +1,39 @@
+# S4 — "Маскировка": атака начинается как легитимный трафик (dictionary),
+# затем добавляется junk_session поверх.
+#
+# Почему это интересно:
+#   Фаза 1 выглядит как "почти легит" — стандартные per-IP rate limits
+#   не срабатывают, если атака идёт с разных MAIL FROM адресов.
+#   Фаза 2 добавляет второй вектор. Статик не умеет бороться с обоими.
+name: s4_camouflage
+description: >
+  Фаза 1: dictionary-атака с ротацией MAIL FROM (маскируется под легит).
+  Фаза 2: добавляется junk_session-атака параллельно.
+  Два вектора одновременно — сложно для статик-конфига.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: phase1_dictionary_only
+    duration: 90s
+    attack:
+      type: rcpt_dictionary
+      workers: 8
+      rcpt_per_session: 150
+      sender_domains:
+        - gmail.com
+        - hotmail.com
+        - yahoo.com
+        - protonmail.com
+
+  # Фаза 2: junk_session (dictionary при этом продолжается в отдельном
+  # экземпляре контейнера — для упрощения используем один процесс)
+  - name: phase2_add_junk
+    duration: 120s
+    attack:
+      type: junk_session
+      workers: 12
+      junk_commands_per_session: 50

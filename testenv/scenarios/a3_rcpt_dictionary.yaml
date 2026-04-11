@@ -1,0 +1,23 @@
+# A3 — dictionary attack: валидный SMTP, но фейковые RCPT TO.
+# Выглядит как "почти легитимный" трафик — сложно фильтровать по IP.
+name: a3_rcpt_dictionary
+description: >
+  Dictionary-атака: корректный EHLO/MAIL FROM, массовый перебор RCPT TO.
+  Нагружает очередь отклонений и логирование.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: dictionary_attack
+    duration: 120s
+    attack:
+      type: rcpt_dictionary
+      workers: 10
+      rcpt_per_session: 200
+      sender_domains:
+        - gmail.com
+        - yahoo.com
+        - outlook.com

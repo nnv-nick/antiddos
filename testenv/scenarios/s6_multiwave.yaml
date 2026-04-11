@@ -1,0 +1,50 @@
+# S6 — "Многоволновой": последовательное добавление векторов атаки.
+# Наиболее реалистичная "продвинутая" атака.
+#
+# Почему это интересно:
+#   Каждая фаза добавляет новый вектор к уже существующим.
+#   Статик-конфиг оптимизирован под один вектор — при накоплении
+#   нескольких начинает давать collateral damage или захлёбываться.
+#   Динамика должна адаптироваться к комбинированной нагрузке.
+name: s6_multiwave
+description: >
+  Фаза 1: connection flood.
+  Фаза 2: + dictionary attack (другой тип нагрузки).
+  Фаза 3: переключение на slow loris (исчерпание процессов).
+  Фаза 4: восстановление.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: phase1_connection_flood
+    duration: 90s
+    attack:
+      type: connection_flood
+      workers: 20
+      rate_per_sec: 0
+
+  - name: phase2_dictionary
+    duration: 90s
+    attack:
+      type: rcpt_dictionary
+      workers: 10
+      rcpt_per_session: 100
+      sender_domains:
+        - evil1.test
+        - evil2.test
+        - evil3.test
+
+  - name: phase3_slow_loris
+    duration: 120s
+    attack:
+      type: slow_loris
+      workers: 70
+      slow_loris_delay_ms: 6000
+
+  - name: recovery
+    duration: 60s
+    attack:
+      type: no_attack

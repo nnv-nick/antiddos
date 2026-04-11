@@ -1,0 +1,52 @@
+# S3 — "Пульсар": чередование интенсивной атаки и затишья.
+#
+# Почему это интересно:
+#   Статик-strict: режет легит во время затиший (когда атаки нет).
+#   Статик-lenient: захлёбывается во время всплесков.
+#   Динамика: быстро ужесточает и быстро откатывает лимиты.
+name: s3_pulsar
+description: >
+  Чередование: 45 сек интенсивная атака → 30 сек тишина → повтор 3 раза.
+  Проверяем скорость адаптации и скорость отката к нормальным лимитам.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: burst_1
+    duration: 45s
+    attack:
+      type: connection_flood
+      workers: 25
+      rate_per_sec: 0
+
+  - name: quiet_1
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: burst_2
+    duration: 45s
+    attack:
+      type: connection_flood
+      workers: 25
+      rate_per_sec: 0
+
+  - name: quiet_2
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: burst_3
+    duration: 45s
+    attack:
+      type: connection_flood
+      workers: 25
+      rate_per_sec: 0
+
+  - name: recovery
+    duration: 60s
+    attack:
+      type: no_attack

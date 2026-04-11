@@ -1,0 +1,17 @@
+# baseline — атаки нет, только фиксируем нормальное поведение системы.
+# Запускать первым для получения baseline-метрик.
+name: baseline
+description: >
+  Нет атаки. Позволяет измерить PDR и latency в спокойном состоянии.
+  Используется как эталон для сравнения с остальными сценариями.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: baseline_measurement
+    duration: 120s
+    attack:
+      type: no_attack

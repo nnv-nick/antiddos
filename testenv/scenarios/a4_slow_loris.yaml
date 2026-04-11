@@ -1,0 +1,19 @@
+# A4 — slow loris: держим соединения открытыми как можно дольше.
+# Исчерпывает пул процессов smtpd без большого трафика.
+name: a4_slow_loris
+description: >
+  Slow loris для SMTP: соединение открывается, данные текут по 1 байту
+  с большой паузой. Цель — исчерпать default_process_limit.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: slow_loris
+    duration: 180s
+    attack:
+      type: slow_loris
+      workers: 80          # хотим занять большую часть process_limit=100
+      slow_loris_delay_ms: 8000
