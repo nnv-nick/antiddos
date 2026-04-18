@@ -27,6 +27,7 @@ var (
 	reStatusDef  = regexp.MustCompile(`postfix/smtp\[\d+\]:.*status=deferred`)
 	reStatusBnc  = regexp.MustCompile(`postfix/smtp\[\d+\]:.*status=bounced`)
 	reQueued     = regexp.MustCompile(`postfix/qmgr\[\d+\]:.*from=<`)
+	reRemoved    = regexp.MustCompile(`postfix/qmgr\[\d+\]:.*removed`)
 	reExpired    = regexp.MustCompile(`postfix/qmgr\[\d+\]:.*expired`)
 )
 
@@ -63,9 +64,17 @@ var (
 		Name: "postfix_qmgr_queued_total",
 		Help: "Messages added to queue",
 	})
+	metRemoved = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "postfix_qmgr_removed_total",
+		Help: "Messages removed from queue (delivered or bounced)",
+	})
 	metExpired = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "postfix_qmgr_expired_total",
 		Help: "Messages expired from queue",
+	})
+	metQueueDepth = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "postfix_queue_depth",
+		Help: "Current number of messages in the queue (queued - removed - expired)",
 	})
 	metLines = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "postfix_exporter_lines_total",
@@ -78,7 +87,8 @@ func init() {
 		metConnects, metDisconnects,
 		metRejectsNoqueue, metRejects,
 		metDelivered, metDeferred, metBounced,
-		metQueued, metExpired,
+		metQueued, metRemoved, metExpired,
+		metQueueDepth,
 		metLines,
 	)
 }
@@ -102,8 +112,13 @@ func processLine(line string) {
 		metBounced.Inc()
 	case reQueued.MatchString(line):
 		metQueued.Inc()
+		metQueueDepth.Inc()
+	case reRemoved.MatchString(line):
+		metRemoved.Inc()
+		metQueueDepth.Dec()
 	case reExpired.MatchString(line):
 		metExpired.Inc()
+		metQueueDepth.Dec()
 	}
 }
 

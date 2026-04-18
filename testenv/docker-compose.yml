@@ -32,6 +32,7 @@ services:
       - ./postfix/main.cf:/etc/postfix/main.cf:ro
       - ./postfix/master.cf:/etc/postfix/master.cf:ro
       - postfix-logs:/var/log
+      - postfix-ctl:/postfix-ctl  # канал команд от antiddos
     cpus: "1.0"
     mem_limit: 512m
     restart: unless-stopped
@@ -115,6 +116,29 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ---------- Antiddos ----------
+  antiddos:
+    build:
+      context: ../
+      dockerfile: testenv/antiddos/Dockerfile
+    container_name: antiddos
+    networks:
+      - mail
+    environment:
+      POSTFIX_LOG: "/var/log/mail.log"
+      EXPORTER_METRICS_URL: "http://postfix-exporter:9154/metrics"
+    volumes:
+      - postfix-logs:/var/log:ro      # читаем mail.log
+      - postfix-ctl:/postfix-ctl      # пишем команды для watchdog
+    depends_on:
+      postfix:
+        condition: service_healthy
+      postfix-exporter:
+        condition: service_started
+    profiles:
+      - protected   # запускается только в режиме с защитой
+    restart: unless-stopped
+
   # ---------- Attacker ----------
   attacker:
     build:
@@ -141,5 +165,6 @@ services:
 
 volumes:
   postfix-logs:
+  postfix-ctl:   # канал команд между antiddos и watchdog внутри postfix
   prometheus-data:
   grafana-data:
