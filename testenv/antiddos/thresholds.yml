@@ -1,0 +1,32 @@
+# Пороги детектора antiddos для тестовой среды.
+# Легитимный трафик: ~2 письма/с (legit-sender с RATE_PER_SEC=2).
+# Все значения можно менять без пересборки образа.
+
+connection_flood:
+  # Новых соединений в секунду
+  conn_rate_warn: 10.0   # ~5× нормального трафика
+  conn_rate_crit: 30.0   # явный флуд
+  conn_rate_low:  5.0    # гистерезис: возврат в Normal
+
+junk_session:
+  # Команд в сессиях без MAIL FROM (mail=0), в секунду
+  wasted_cmd_rate_warn: 5.0
+  wasted_cmd_rate_crit: 15.0
+  wasted_cmd_rate_low:  2.0
+
+slow_loris:
+  # Одновременно открытых сессий (connect минус disconnect за окно 30s)
+  active_sessions_warn: 20
+  active_sessions_crit: 50
+  active_sessions_low:  10
+  # Вторичное условие: таймаутов в секунду (нужны оба условия для срабатывания)
+  timeout_rate_trigger: 1.0
+  timeout_rate_low:     0.5
+
+dict_attack:
+  # NOQUEUE-отказов в секунду при умеренном числе соединений
+  noqueue_rate_warn: 5.0
+  noqueue_rate_crit: 15.0
+  noqueue_rate_low:  2.0
+  # Если conn_rate выше этого — классифицируем как connection_flood, не dict_attack
+  conn_rate_max: 10.0

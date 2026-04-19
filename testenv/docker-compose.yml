@@ -127,9 +127,11 @@ services:
     environment:
       POSTFIX_LOG: "/var/log/mail.log"
       EXPORTER_METRICS_URL: "http://postfix-exporter:9154/metrics"
+      THRESHOLDS_PATH: "/etc/antiddos/thresholds.yml"
     volumes:
-      - postfix-logs:/var/log:ro      # читаем mail.log
-      - postfix-ctl:/postfix-ctl      # пишем команды для watchdog
+      - postfix-logs:/var/log:ro                              # читаем mail.log
+      - postfix-ctl:/postfix-ctl                              # пишем команды для watchdog
+      - ./antiddos/thresholds.yml:/etc/antiddos/thresholds.yml:ro  # пороги детектора
     depends_on:
       postfix:
         condition: service_healthy
