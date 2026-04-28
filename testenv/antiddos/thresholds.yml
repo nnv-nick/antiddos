@@ -30,3 +30,37 @@ dict_attack:
   noqueue_rate_low:  2.0
   # Если conn_rate выше этого — классифицируем как connection_flood, не dict_attack
   conn_rate_max: 10.0
+
+# =============================================================
+#  Actuator: параметры расчёта мер смягчения
+# =============================================================
+actuator:
+  # α для EMA базовой линии (обновляется только в периоды без атак)
+  # 0.1 = медленная адаптация (~10 снятий снимков для полного обновления)
+  baseline_alpha: 0.1
+
+  connection_flood:
+    # smtpd_client_connection_rate_limit = ceil(baseline_conn_rate * 60 * multiplier)
+    # Легитимный трафик ~2/s → baseline ~2/s → Warning limit = ceil(2*60*2)=240/мин
+    rate_limit_multiplier_warn: 2.0
+    rate_limit_multiplier_crit: 1.2
+    # Нижняя граница: не обрезать трафик совсем при очень низком baseline
+    rate_limit_min: 5
+
+  slow_loris:
+    # Снижаем smtpd_timeout — медленные клиенты отваливаются быстрее
+    # Легитимные SMTP-клиенты укладываются в секунды, 60s безопасно
+    timeout_warn_sec: 120
+    timeout_crit_sec: 60
+
+  junk_session:
+    # Снижаем smtpd_hard_error_limit — сессии с ошибками рвутся быстрее
+    hard_error_limit_warn: 10
+    hard_error_limit_crit: 5
+
+  dict_attack:
+    # smtpd_error_sleep_time = clamp(ceil(noqueue_rate / divisor), min, max)
+    # Атакующий с 20 NOQUEUE/s получит паузу 4s → реальная скорость ~0.25 ошибки/s
+    error_sleep_divisor: 5.0
+    error_sleep_min_sec: 1
+    error_sleep_max_sec: 10

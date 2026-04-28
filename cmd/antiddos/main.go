@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nnv-nick/antiddos/cmd/antiddos/actuator"
 	"github.com/nnv-nick/antiddos/cmd/antiddos/collector"
 	"github.com/nnv-nick/antiddos/cmd/antiddos/detector"
 )
@@ -27,29 +28,38 @@ func main() {
 	logPath := flag.String("log", envOr("POSTFIX_LOG", "/var/log/mail.log"), "Path to Postfix mail.log")
 	metricsURL := flag.String("metrics-url", envOr("EXPORTER_METRICS_URL", "http://postfix-exporter:9154/metrics"), "postfix-exporter metrics URL")
 	thresholdsPath := flag.String("thresholds", envOr("THRESHOLDS_PATH", ""), "Path to thresholds YAML (optional, uses defaults if empty)")
+	ctlDir := flag.String("ctl-dir", envOr("POSTFIX_CTL_DIR", "/postfix-ctl"), "Path to postfix-ctl directory")
 	interval := flag.Duration("interval", 5*time.Second, "Detector poll interval")
 	flag.Parse()
 
-	log.Printf("antiddos: log=%s metricsURL=%s interval=%s", *logPath, *metricsURL, *interval)
+	log.Printf("antiddos: log=%s metricsURL=%s ctlDir=%s interval=%s", *logPath, *metricsURL, *ctlDir, *interval)
 
-	// Загружаем пороги
-	thresholds := detector.DefaultThresholds()
+	// Загружаем пороги и конфиг actuator'а
+	detThresholds := detector.DefaultThresholds()
+	actConfig := actuator.DefaultConfig()
 	if *thresholdsPath != "" {
 		t, err := detector.LoadFromFile(*thresholdsPath)
 		if err != nil {
 			log.Fatalf("antiddos: failed to load thresholds from %s: %v", *thresholdsPath, err)
 		}
-		thresholds = t
-		log.Printf("antiddos: loaded thresholds from %s", *thresholdsPath)
+		detThresholds = t
+
+		c, err := actuator.LoadConfigFromFile(*thresholdsPath)
+		if err != nil {
+			log.Fatalf("antiddos: failed to load actuator config from %s: %v", *thresholdsPath, err)
+		}
+		actConfig = c
+		log.Printf("antiddos: loaded config from %s", *thresholdsPath)
 	} else {
-		log.Println("antiddos: using default thresholds")
+		log.Println("antiddos: using default thresholds and actuator config")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	c := collector.NewWithHTTP(*logPath, *metricsURL)
-	d := detector.New(thresholds)
+	d := detector.New(detThresholds)
+	a := actuator.New(*ctlDir, actConfig)
 
 	// Запускаем collector в фоне
 	go c.Run(ctx)
@@ -57,7 +67,6 @@ func main() {
 	// Ждём первых данных
 	time.Sleep(2 * time.Second)
 
-	// TODO: заменить заглушку на реальный actuator
 	ticker := time.NewTicker(*interval)
 	defer ticker.Stop()
 	for {
@@ -72,7 +81,9 @@ func main() {
 				s.ConnRate, s.ActiveSessions, s.NoqueueRate,
 				s.TimeoutRate, s.WastedCmdRate, s.QueueDepth,
 				dec.Attack, dec.Severity)
-			// TODO: actuator.Apply(dec)
+			if err := a.Apply(dec, s); err != nil {
+				log.Printf("actuator error: %v", err)
+			}
 		}
 	}
 }
