@@ -10,8 +10,8 @@ connection_flood:
 
 junk_session:
   # Команд в сессиях без MAIL FROM (mail=0), в секунду
-  wasted_cmd_rate_warn: 5.0
-  wasted_cmd_rate_crit: 15.0
+  wasted_cmd_rate_warn: 4.0
+  wasted_cmd_rate_crit: 10.0
   wasted_cmd_rate_low:  2.0
 
 slow_loris:
@@ -25,9 +25,9 @@ slow_loris:
 
 dict_attack:
   # NOQUEUE-отказов в секунду при умеренном числе соединений
-  noqueue_rate_warn: 5.0
-  noqueue_rate_crit: 15.0
-  noqueue_rate_low:  2.0
+  noqueue_rate_warn: 3.0
+  noqueue_rate_crit: 7.0
+  noqueue_rate_low:  1.5
   # Если conn_rate выше этого — классифицируем как connection_flood, не dict_attack
   conn_rate_max: 10.0
 
@@ -48,10 +48,14 @@ actuator:
     rate_limit_min: 5
 
   slow_loris:
-    # Снижаем smtpd_timeout — медленные клиенты отваливаются быстрее
-    # Легитимные SMTP-клиенты укладываются в секунды, 60s безопасно
-    timeout_warn_sec: 120
-    timeout_crit_sec: 60
+    # smtpd_per_record_deadline=yes включается при любом уровне атаки.
+    # Легитимные клиенты отправляют команды быстро (<<10s), поэтому короткий
+    # timeout безопасен. smtpd_client_connection_count_limit ограничивает
+    # число слотов на один IP — при атаке с одного IP это главная защита.
+    timeout_warn_sec: 30
+    timeout_crit_sec: 10
+    conn_count_limit_warn: 5
+    conn_count_limit_crit: 3
 
   junk_session:
     # Снижаем smtpd_hard_error_limit — сессии с ошибками рвутся быстрее

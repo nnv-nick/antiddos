@@ -69,6 +69,26 @@ func TestParseLineDisconnectJunkUnknown(t *testing.T) {
 	}
 }
 
+func TestParseLineDisconnectXYFormat(t *testing.T) {
+	// Postfix 3.x логирует X/Y для команд: X — успешных, Y — всего.
+	// Реальная строка при XJUNK-атаке: quit=1 unknown=0/3 commands=1/4
+	// Нас интересует total (Y=4), а не успешных (X=1).
+	line := "May 01 10:53:30 mail postfix/smtpd[7135]: disconnect from unknown[127.0.0.1] quit=1 unknown=0/3 commands=1/4"
+	e, ok := collector.ParseLine(line)
+	if !ok {
+		t.Fatal("expected ok=true")
+	}
+	if e.Type != collector.EvDisconnect {
+		t.Errorf("type = %v, want EvDisconnect", e.Type)
+	}
+	if e.Commands != 4 {
+		t.Errorf("Commands = %d, want 4 (total from X/Y format)", e.Commands)
+	}
+	if e.Mail != 0 {
+		t.Errorf("Mail = %d, want 0 (no mail= field means no MAIL FROM)", e.Mail)
+	}
+}
+
 func TestParseLineNoqueue(t *testing.T) {
 	line := "Apr 18 12:00:05 mail postfix/smtpd[1234]: NOQUEUE: reject: RCPT from unknown[1.2.3.4]: 550 relay denied"
 	e, ok := collector.ParseLine(line)

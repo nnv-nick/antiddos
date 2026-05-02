@@ -10,9 +10,12 @@ var (
 	reConnect = regexp.MustCompile(`postfix/smtpd\[\d+\]: connect from `)
 
 	// disconnect from unknown[1.2.3.4] ehlo=1 mail=1 rcpt=1 data=1 quit=1 commands=5
+	// disconnect from unknown[1.2.3.4] quit=1 unknown=0/3 commands=1/4
+	// В формате X/Y: X — успешных, Y — всего. Нас интересует Y (total).
 	reDisconnect = regexp.MustCompile(`postfix/smtpd\[\d+\]: disconnect from `)
 	reMailCount  = regexp.MustCompile(`\bmail=(\d+)\b`)
-	reCmdCount   = regexp.MustCompile(`\bcommands=(\d+)\b`)
+	// Поддерживает оба формата: commands=5 и commands=1/4 (total = последнее число).
+	reCmdCount = regexp.MustCompile(`\bcommands=(?:\d+/)?(\d+)\b`)
 
 	reNoqueue = regexp.MustCompile(`postfix/smtpd\[\d+\]: NOQUEUE: reject`)
 	reTimeout = regexp.MustCompile(`postfix/smtpd\[\d+\]: timeout after`)

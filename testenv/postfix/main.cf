@@ -29,9 +29,11 @@ data_directory = /var/lib/postfix
 maillog_file = /var/log/mail.log
 
 # ---------- Лимиты (baseline — без ужесточений) ----------
-# Процессы
-default_process_limit = 10
+# Процессы: достаточно высокий лимит, чтобы slow_loris не мог исчерпать слоты
+# до срабатывания детектора. Actuator снижает per-IP лимит при атаке.
+default_process_limit = 100
 smtpd_client_connection_count_limit = 50
+smtpd_per_record_deadline = no
 
 # Rate limiting (отключён в baseline)
 smtpd_client_connection_rate_limit = 0
@@ -49,8 +51,13 @@ smtpd_error_sleep_time = 1s
 smtpd_timeout = 300s
 
 # ---------- Ограничения получателей ----------
+# relay_recipient_maps ограничивает допустимых получателей для relay_domains.
+# Адреса не из этого файла отклоняются с NOQUEUE — это даёт сигнал для dict_attack detector'а.
+relay_recipient_maps = hash:/etc/postfix/relay_recipients
+
 smtpd_recipient_restrictions =
     permit_mynetworks,
+    reject_unlisted_recipient,
     permit
 
 # ---------- TLS (отключён для простоты тестирования) ----------

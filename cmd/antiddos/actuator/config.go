@@ -18,8 +18,13 @@ type ConnectionFloodActConfig struct {
 
 // SlowLorisActConfig — параметры смягчения для slow_loris.
 type SlowLorisActConfig struct {
-	TimeoutWarnSec int `yaml:"timeout_warn_sec"` // smtpd_timeout при Warning
-	TimeoutCritSec int `yaml:"timeout_crit_sec"` // smtpd_timeout при Critical
+	// smtpd_per_record_deadline = yes меняет семантику smtpd_timeout:
+	// таймер считается до конца целой SMTP-команды, а не до следующего байта.
+	// Это ломает slow-loris стратегию "слать по байту раз в N секунд".
+	TimeoutWarnSec      int `yaml:"timeout_warn_sec"`       // smtpd_timeout при Warning
+	TimeoutCritSec      int `yaml:"timeout_crit_sec"`       // smtpd_timeout при Critical
+	ConnCountLimitWarn  int `yaml:"conn_count_limit_warn"`  // smtpd_client_connection_count_limit при Warning
+	ConnCountLimitCrit  int `yaml:"conn_count_limit_crit"`  // smtpd_client_connection_count_limit при Critical
 }
 
 // JunkSessionActConfig — параметры смягчения для junk_session.
@@ -56,8 +61,10 @@ func DefaultConfig() Config {
 			RateLimitMin:            5,
 		},
 		SlowLoris: SlowLorisActConfig{
-			TimeoutWarnSec: 120,
-			TimeoutCritSec: 60,
+			TimeoutWarnSec:     30,
+			TimeoutCritSec:     10,
+			ConnCountLimitWarn: 5,
+			ConnCountLimitCrit: 3,
 		},
 		JunkSession: JunkSessionActConfig{
 			HardErrorLimitWarn: 10,

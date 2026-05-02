@@ -1,0 +1,63 @@
+# S5 — "Гистерезис": проверяем, что система не сбрасывает severity преждевременно.
+#
+# Пороги connection_flood (thresholds.yml):
+#   conn_rate_warn = 10/s   — порог Warning
+#   conn_rate_crit = 30/s   — порог Critical
+#   conn_rate_low  =  5/s   — порог возврата в Normal
+#
+# Легитимный трафик: ~2 conn/s (legit-sender всегда работает).
+# Атака суммируется с легитом.
+#
+# Ожидаемое поведение по фазам:
+#   warmup         → normal   (только легит, ~2/s)
+#   phase1_warning → warning  (атака+легит ~14/s, выше warn=10)
+#   phase2_critical→ critical (атака+легит ~37/s, выше crit=30)
+#   phase3_backoff → warning  (атака снижена, ~14/s — выше low, ниже crit)
+#   phase4_hyst    → WARNING  (атака ~6/s — НИЖЕ warn=10, но ВЫШЕ low=5)
+#                             ← здесь гистерезис: система НЕ возвращается в normal
+#   recovery       → normal   (атака снята, только легит ~2/s, ниже low=5)
+name: s5_hysteresis
+description: >
+  Тест гистерезиса: после critical атака снижается до зоны между low и warn.
+  Корректная система должна удерживать severity=warning, а не сбрасывать в normal.
+  Возврат в normal происходит только когда трафик падает ниже conn_rate_low=5.
+
+phases:
+  - name: warmup
+    duration: 30s
+    attack:
+      type: no_attack
+
+  - name: phase1_warning
+    duration: 60s
+    attack:
+      type: connection_flood
+      workers: 3
+      rate_per_sec: 4   # 3×4=12 + 2 легит ≈ 14/s → warning
+
+  - name: phase2_critical
+    duration: 60s
+    attack:
+      type: connection_flood
+      workers: 7
+      rate_per_sec: 5   # 7×5=35 + 2 легит ≈ 37/s → critical
+
+  - name: phase3_backoff
+    duration: 60s
+    attack:
+      type: connection_flood
+      workers: 3
+      rate_per_sec: 4   # 3×4=12 + 2 легит ≈ 14/s → должно упасть до warning, не normal
+
+  - name: phase4_hysteresis
+    duration: 60s
+    attack:
+      type: connection_flood
+      workers: 2
+      rate_per_sec: 2   # 2×2=4 + 2 легит ≈ 6/s — ниже warn(10), выше low(5)
+                        # ОЖИДАЕТСЯ: severity остаётся warning (гистерезис удерживает)
+
+  - name: recovery
+    duration: 60s
+    attack:
+      type: no_attack   # только легит ~2/s — ниже low(5) → normal

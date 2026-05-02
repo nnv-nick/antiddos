@@ -15,6 +15,8 @@ var defaultPostfixLines = []string{
 	"smtpd_hard_error_limit = 20",
 	"smtpd_error_sleep_time = 1s",
 	"smtpd_timeout = 300s",
+	"smtpd_per_record_deadline = no",
+	"smtpd_client_connection_count_limit = 50",
 }
 
 // ComputeLines вычисляет строки конфигурации Postfix для данного Decision.
@@ -61,14 +63,22 @@ func junkSessionLines(sev detector.Severity, cfg Config) []string {
 	}
 }
 
-// slowLorisLines снижает smtpd_timeout — медленные клиенты быстрее отваливаются.
+// slowLorisLines противодействует slow_loris тремя мерами:
+//  1. smtpd_per_record_deadline=yes — таймаут применяется к целой SMTP-команде,
+//     а не к каждому байту. Стратегия "байт раз в N секунд" перестаёт работать.
+//  2. smtpd_timeout — короткий дедлайн на завершение команды.
+//  3. smtpd_client_connection_count_limit — ограничивает слоты на один IP.
 func slowLorisLines(sev detector.Severity, cfg Config) []string {
 	timeout := cfg.SlowLoris.TimeoutWarnSec
+	connLimit := cfg.SlowLoris.ConnCountLimitWarn
 	if sev == detector.SeverityCritical {
 		timeout = cfg.SlowLoris.TimeoutCritSec
+		connLimit = cfg.SlowLoris.ConnCountLimitCrit
 	}
 	return []string{
+		"smtpd_per_record_deadline = yes",
 		fmt.Sprintf("smtpd_timeout = %ds", timeout),
+		fmt.Sprintf("smtpd_client_connection_count_limit = %d", connLimit),
 	}
 }
 

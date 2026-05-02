@@ -3,7 +3,9 @@ set -e
 
 # Создаём необходимые директории и файлы
 mkdir -p /var/log /var/spool/postfix /var/lib/postfix
-touch /var/log/mail.log
+# Сбрасываем лог при старте: postfix-exporter считает queue_depth из лога,
+# и без сброса метрика расходится с реальностью после перезапуска контейнера.
+: > /var/log/mail.log
 chown syslog:adm /var/log/mail.log
 
 # Создаём директорию для команд от antiddos
@@ -32,6 +34,13 @@ watchdog() {
 }
 
 watchdog &
+
+# Копируем resolv.conf в chroot Postfix, иначе smtp-клиент не резолвит хосты
+mkdir -p /var/spool/postfix/etc
+cp /etc/resolv.conf /var/spool/postfix/etc/resolv.conf
+
+# Генерируем hash-таблицу для relay_recipient_maps
+postmap /etc/postfix/relay_recipients
 
 # Инициализируем Postfix
 postfix check

@@ -6,6 +6,7 @@ RUN apt-get update && \
 
 COPY main.cf /etc/postfix/main.cf
 COPY master.cf /etc/postfix/master.cf
+COPY relay_recipients /etc/postfix/relay_recipients
 
 # rsyslog пишет mail.log, Postfix читает его
 COPY rsyslog.conf /etc/rsyslog.conf

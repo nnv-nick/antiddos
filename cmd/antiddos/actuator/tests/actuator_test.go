@@ -23,8 +23,10 @@ func testConfig() actuator.Config {
 			RateLimitMin:            5,
 		},
 		SlowLoris: actuator.SlowLorisActConfig{
-			TimeoutWarnSec: 120,
-			TimeoutCritSec: 60,
+			TimeoutWarnSec:     120,
+			TimeoutCritSec:     60,
+			ConnCountLimitWarn: 5,
+			ConnCountLimitCrit: 3,
 		},
 		JunkSession: actuator.JunkSessionActConfig{
 			HardErrorLimitWarn: 10,
@@ -93,6 +95,8 @@ func TestComputeLines_Normal_ReturnsDefaults(t *testing.T) {
 		"smtpd_hard_error_limit = 20",
 		"smtpd_error_sleep_time = 1s",
 		"smtpd_timeout = 300s",
+		"smtpd_per_record_deadline = no",
+		"smtpd_client_connection_count_limit = 50",
 	}
 	if !equalLines(lines, want) {
 		t.Errorf("want default lines:\n%v\ngot:\n%v", want, lines)
@@ -142,18 +146,26 @@ func TestComputeLines_ConnFlood_MinClamp(t *testing.T) {
 func TestComputeLines_SlowLoris_Warning(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
 	lines := actuator.ComputeLines(dec(detector.AttackSlowLoris, detector.SeverityWarning), snap(), b, testConfig())
-	want := "smtpd_timeout = 120s"
-	if len(lines) != 1 || lines[0] != want {
-		t.Errorf("want %q, got %v", want, lines)
+	want := []string{
+		"smtpd_per_record_deadline = yes",
+		"smtpd_timeout = 120s",
+		"smtpd_client_connection_count_limit = 5",
+	}
+	if !equalLines(lines, want) {
+		t.Errorf("want %v, got %v", want, lines)
 	}
 }
 
 func TestComputeLines_SlowLoris_Critical(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
 	lines := actuator.ComputeLines(dec(detector.AttackSlowLoris, detector.SeverityCritical), snap(), b, testConfig())
-	want := "smtpd_timeout = 60s"
-	if len(lines) != 1 || lines[0] != want {
-		t.Errorf("want %q, got %v", want, lines)
+	want := []string{
+		"smtpd_per_record_deadline = yes",
+		"smtpd_timeout = 60s",
+		"smtpd_client_connection_count_limit = 3",
+	}
+	if !equalLines(lines, want) {
+		t.Errorf("want %v, got %v", want, lines)
 	}
 }
 
