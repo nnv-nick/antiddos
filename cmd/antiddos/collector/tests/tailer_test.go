@@ -10,8 +10,6 @@ import (
 	"github.com/nnv-nick/antiddos/cmd/antiddos/collector"
 )
 
-// TestTailerReadsNewLines проверяет, что tailer подхватывает строки,
-// дописанные в файл после его открытия.
 func TestTailerReadsNewLines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mail.log")
@@ -27,7 +25,6 @@ func TestTailerReadsNewLines(t *testing.T) {
 
 	go collector.NewLogTailer(path, buf).Run(ctx)
 
-	// Даём tailer'у время открыть файл и встать на EOF
 	time.Sleep(100 * time.Millisecond)
 
 	line := "Apr 18 12:00:01 mail postfix/smtpd[1]: connect from unknown[1.2.3.4]\n"
@@ -35,7 +32,6 @@ func TestTailerReadsNewLines(t *testing.T) {
 	f.Sync()
 	f.Close()
 
-	// Ждём обработки (poll-интервал = 200ms)
 	time.Sleep(500 * time.Millisecond)
 
 	s := buf.Snapshot()
@@ -44,7 +40,6 @@ func TestTailerReadsNewLines(t *testing.T) {
 	}
 }
 
-// TestTailerIgnoresExistingContent проверяет, что строки до запуска не читаются.
 func TestTailerIgnoresExistingContent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mail.log")
@@ -68,7 +63,6 @@ func TestTailerIgnoresExistingContent(t *testing.T) {
 	}
 }
 
-// TestTailerCancelStops проверяет, что Run завершается при отмене ctx.
 func TestTailerCancelStops(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mail.log")
@@ -93,7 +87,6 @@ func TestTailerCancelStops(t *testing.T) {
 	}
 }
 
-// TestTailerMultipleEvents проверяет обработку нескольких строк разных типов.
 func TestTailerMultipleEvents(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mail.log")

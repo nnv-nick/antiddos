@@ -1,18 +1,7 @@
-# S1 — "Смена вектора": атака начинается как junk_session,
-# затем переключается на connection_flood.
-#
-# Почему это интересно:
-#   Статик-конфиг, настроенный на борьбу с junk_session (низкий junk_command_limit),
-#   не помогает против connection_flood. И наоборот.
-#   Динамический сервис должен адаптироваться к новому вектору.
-#
-# Параметры подобраны так, чтобы каждая фаза реально нагружала Postfix:
-#   - junk_session: 40 воркеров >> process_limit=25, сессии ~1s → слоты заняты
-#   - connection_flood: 60 воркеров, rate=40/s → постоянный шторм новых соединений
 name: s1_vector_switch
 description: >
-  Фаза 1: junk-команды внутри сессий (40 воркеров).
-  Фаза 2: переключение на флуд соединениями (60 воркеров).
+  Фаза 1: junk-команды внутри сессий
+  Фаза 2: переключение на флуд соединениями
   Статик-конфиг настроен на один вектор — проигрывает при смене.
 
 phases:
@@ -26,7 +15,7 @@ phases:
     attack:
       type: junk_session
       workers: 40
-      junk_commands_per_session: 15  # 3 instant + 12×1s sleep = ~12s/session → 10 slots always full
+      junk_commands_per_session: 15
 
   - name: transition
     duration: 10s
@@ -37,5 +26,5 @@ phases:
     duration: 120s
     attack:
       type: connection_flood
-      workers: 60
-      rate_per_sec: 40   # ограничено — не кладёт хост, но давит Postfix
+      workers: 30
+      rate_per_sec: 30

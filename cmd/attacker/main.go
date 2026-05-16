@@ -1,6 +1,3 @@
-// attacker — генератор нагрузки для тестирования Postfix.
-// Читает сценарий из YAML-файла и последовательно выполняет фазы.
-// Каждая фаза запускает N воркеров с заданным типом атаки и rate.
 package main
 
 import (
@@ -89,7 +86,6 @@ func main() {
 	log.Printf("scenario %q completed", scenario.Name)
 }
 
-// runPhase запускает воркеры для одной фазы и ждёт её завершения.
 func runPhase(phase Phase, smtpAddr string) {
 	if phase.Attack.Type == "no_attack" {
 		log.Printf("  no attack — waiting %s", phase.Duration)
@@ -118,15 +114,9 @@ func runPhase(phase Phase, smtpAddr string) {
 	wg.Wait()
 }
 
-// workerLoop выполняет атаку в цикле до закрытия ctx.
 func workerLoop(ctx <-chan struct{}, cfg AttackConfig, smtpAddr string) {
 	var limiter <-chan time.Time
 	if cfg.RatePerSec > 0 {
-		// Делим общий rate на число воркеров внутри самого воркера не нужно —
-		// вызывающий код уже создал N воркеров, каждый делает 1 итерацию.
-		// Но rate указан суммарный, поэтому интервал = 1/rate * workers.
-		// Здесь мы не знаем workers, поэтому rate передаётся как "на воркер".
-		// Для удобства: rate_per_sec в YAML — суммарный, делим на workers при запуске.
 		interval := time.Duration(float64(time.Second) / cfg.RatePerSec)
 		t := time.NewTicker(interval)
 		defer t.Stop()

@@ -4,21 +4,17 @@ networks:
 
 services:
 
-  # ---------- Mail sink (принимает всё, ничего не хранит) ----------
   smtp-sink:
     image: ubuntu/postfix:latest
-    # используем smtp-sink из пакета postfix-dev / postfix
-    # собираем минимальный образ с smtp-sink бинарём
     build:
       context: ./smtp-sink
     container_name: smtp-sink
     networks:
       - mail
     ports:
-      - "2526:2525"   # только для отладки снаружи
+      - "2526:2525"
     restart: unless-stopped
 
-  # ---------- Postfix (тестируемый сервер) ----------
   postfix:
     build:
       context: ./postfix
@@ -27,12 +23,12 @@ services:
     networks:
       - mail
     ports:
-      - "2525:25"     # снаружи для отладки
+      - "2525:25"
     volumes:
       - ./postfix/main.cf:/etc/postfix/main.cf:ro
       - ./postfix/master.cf:/etc/postfix/master.cf:ro
       - postfix-logs:/var/log
-      - postfix-ctl:/postfix-ctl  # канал команд от antiddos
+      - postfix-ctl:/postfix-ctl
     cpus: "1.0"
     mem_limit: 512m
     restart: unless-stopped
@@ -45,7 +41,6 @@ services:
       retries: 10
       start_period: 10s
 
-  # ---------- Postfix log exporter -> Prometheus ----------
   postfix-exporter:
     build:
       context: ../
@@ -62,7 +57,6 @@ services:
       - postfix
     restart: unless-stopped
 
-  # ---------- Prometheus ----------
   prometheus:
     image: prom/prometheus:v2.51.2
     container_name: prometheus
@@ -75,7 +69,6 @@ services:
       - prometheus-data:/prometheus
     restart: unless-stopped
 
-  # ---------- Grafana ----------
   grafana:
     image: grafana/grafana:10.4.2
     container_name: grafana
@@ -94,7 +87,6 @@ services:
       - prometheus
     restart: unless-stopped
 
-  # ---------- Legit sender ----------
   legit-sender:
     build:
       context: ../
@@ -103,20 +95,19 @@ services:
     networks:
       - mail
     ports:
-      - "9155:9155"   # Prometheus metrics
+      - "9155:9155"
     environment:
       SMTP_HOST: postfix
       SMTP_PORT: "25"
       FROM_ADDR: legit@sender.test
       TO_ADDR: user@test.local
-      RATE_PER_SEC: "2"        # писем в секунду при нормальной работе
+      RATE_PER_SEC: "2"
       METRICS_ADDR: ":9155"
     depends_on:
       postfix:
         condition: service_healthy
     restart: unless-stopped
 
-  # ---------- Antiddos ----------
   antiddos:
     build:
       context: ../
@@ -129,19 +120,18 @@ services:
       EXPORTER_METRICS_URL: "http://postfix-exporter:9154/metrics"
       THRESHOLDS_PATH: "/etc/antiddos/thresholds.yml"
     volumes:
-      - postfix-logs:/var/log:ro                              # читаем mail.log
-      - postfix-ctl:/postfix-ctl                              # пишем команды для watchdog
-      - ./antiddos/thresholds.yml:/etc/antiddos/thresholds.yml:ro  # пороги детектора
+      - postfix-logs:/var/log:ro
+      - postfix-ctl:/postfix-ctl
+      - ./antiddos/thresholds.yml:/etc/antiddos/thresholds.yml:ro
     depends_on:
       postfix:
         condition: service_healthy
       postfix-exporter:
         condition: service_started
     profiles:
-      - protected   # запускается только в режиме с защитой
+      - protected
     restart: unless-stopped
 
-  # ---------- Attacker ----------
   attacker:
     build:
       context: ../
@@ -150,23 +140,22 @@ services:
     networks:
       - mail
     ports:
-      - "9156:9156"   # Prometheus metrics
+      - "9156:9156"
     environment:
       SMTP_HOST: postfix
       SMTP_PORT: "25"
       METRICS_ADDR: ":9156"
     volumes:
       - ./scenarios:/scenarios:ro
-    # сценарий передаётся при запуске через docker compose run attacker /scenarios/s1.yaml
     command: ["--scenario", "/scenarios/baseline.yaml"]
-    cpus: "1.5"     # 4 CPU в VM: 1.0 postfix + 1.5 attacker + 1.5 остальным
+    cpus: "1.5"
     profiles:
-      - attack    # не стартует автоматически, запускается вручную
+      - attack
     depends_on:
       - postfix
 
 volumes:
   postfix-logs:
-  postfix-ctl:   # канал команд между antiddos и watchdog внутри postfix
+  postfix-ctl:
   prometheus-data:
   grafana-data:

@@ -1,5 +1,3 @@
-// legit-sender — непрерывно шлёт письма на Postfix и экспортирует метрики.
-// Метрики позволяют измерить PDR (Protected Delivery Rate) под атакой.
 package main
 
 import (
@@ -7,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"net/smtp"
 	"os"
 	"strconv"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"net/http"
 )
 
 var (
@@ -49,11 +47,8 @@ func envOr(key, def string) string {
 }
 
 const (
-	dialTimeout  = 3 * time.Second  // TCP connect timeout
-	smtpDeadline = 6 * time.Second  // total SMTP transaction deadline after connect
-	// 6s: normal transaction completes in <500ms, so plenty of margin.
-	// Junk sessions hold slots for ~12s (3 free + 12×1s sleep),
-	// so legit attempts that queue behind them will timeout → rejected.
+	dialTimeout  = 3 * time.Second
+	smtpDeadline = 6 * time.Second
 )
 
 func sendOne(addr, from, to string) error {
@@ -65,8 +60,6 @@ func sendOne(addr, from, to string) error {
 		from, to, time.Now().Format(time.RFC3339),
 	)
 
-	// Dial with explicit timeout — without this, SendMail hangs indefinitely
-	// when all Postfix workers are busy (e.g. during slow_loris attack).
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	if err != nil {
 		metricsSent.Inc()
@@ -141,7 +134,6 @@ func main() {
 	log.Printf("legit-sender: smtp=%s from=%s to=%s rate=%.1f/s interval=%s metrics=%s",
 		smtpAddr, *from, *to, rate, interval, *metricsAddr)
 
-	// Запускаем HTTP-сервер метрик
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		if err := http.ListenAndServe(*metricsAddr, nil); err != nil {

@@ -7,24 +7,15 @@ import (
 )
 
 var (
-	reConnect = regexp.MustCompile(`postfix/smtpd\[\d+\]: connect from `)
-
-	// disconnect from unknown[1.2.3.4] ehlo=1 mail=1 rcpt=1 data=1 quit=1 commands=5
-	// disconnect from unknown[1.2.3.4] quit=1 unknown=0/3 commands=1/4
-	// В формате X/Y: X — успешных, Y — всего. Нас интересует Y (total).
+	reConnect    = regexp.MustCompile(`postfix/smtpd\[\d+\]: connect from `)
 	reDisconnect = regexp.MustCompile(`postfix/smtpd\[\d+\]: disconnect from `)
 	reMailCount  = regexp.MustCompile(`\bmail=(\d+)\b`)
-	// Поддерживает оба формата: commands=5 и commands=1/4 (total = последнее число).
-	reCmdCount = regexp.MustCompile(`\bcommands=(?:\d+/)?(\d+)\b`)
-
-	reNoqueue = regexp.MustCompile(`postfix/smtpd\[\d+\]: NOQUEUE: reject`)
-	reTimeout = regexp.MustCompile(`postfix/smtpd\[\d+\]: timeout after`)
-	reNonSmtp = regexp.MustCompile(`postfix/smtpd\[\d+\]: warning: non-SMTP command`)
+	reCmdCount   = regexp.MustCompile(`\bcommands=(?:\d+/)?(\d+)\b`)
+	reNoqueue    = regexp.MustCompile(`postfix/smtpd\[\d+\]: NOQUEUE: reject`)
+	reTimeout    = regexp.MustCompile(`postfix/smtpd\[\d+\]: timeout after`)
+	reNonSmtp    = regexp.MustCompile(`postfix/smtpd\[\d+\]: warning: non-SMTP command`)
 )
 
-// ParseLine разбирает одну строку mail.log.
-// Возвращает (Event, true) если строка релевантна, (zero, false) иначе.
-// Временна́я метка события выставляется в time.Now() в момент вызова.
 func ParseLine(line string) (Event, bool) {
 	now := time.Now()
 
@@ -49,8 +40,6 @@ func ParseLine(line string) (Event, bool) {
 		return Event{At: now, Type: EvTimeout}, true
 
 	case reNonSmtp.MatchString(line):
-		// Трактуем как disconnect-без-mail: соединение занято, письма нет.
-		// commands=1 (сама невалидная команда) для корректного wasted_cmd_rate.
 		return Event{At: now, Type: EvDisconnect, Commands: 1, Mail: 0}, true
 	}
 

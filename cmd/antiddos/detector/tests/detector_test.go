@@ -10,7 +10,6 @@ import (
 	"github.com/nnv-nick/antiddos/cmd/antiddos/detector"
 )
 
-// testThresholds возвращает пороги с простыми числами для предсказуемых тестов.
 func testThresholds() detector.Thresholds {
 	return detector.Thresholds{
 		ConnectionFlood: detector.ConnectionFloodThresholds{
@@ -42,8 +41,6 @@ func testThresholds() detector.Thresholds {
 func snap() collector.Snapshot {
 	return collector.Snapshot{At: time.Now()}
 }
-
-// --- ConnectionFlood ---
 
 func TestConnFlood_Normal(t *testing.T) {
 	d := detector.New(testThresholds())
@@ -81,17 +78,15 @@ func TestConnFlood_Critical(t *testing.T) {
 	}
 }
 
-// TestConnFlood_HysteresisNoEarlyRecover проверяет, что между Warn и Low атака не гасится.
-// ConnRate падает с Critical (50) до 7 — выше Low (5), значит Warning, не Normal.
 func TestConnFlood_HysteresisNoEarlyRecover(t *testing.T) {
 	d := detector.New(testThresholds())
 
 	s := snap()
 	s.ConnRate = 50.0
-	d.Analyze(s) // → Critical
+	d.Analyze(s)
 
 	s.ConnRate = 7.0
-	dec := d.Analyze(s) // выше Low=5, должен остаться Warning, не Normal
+	dec := d.Analyze(s)
 	if dec.Attack != detector.AttackConnectionFlood {
 		t.Errorf("want AttackConnectionFlood, got %v", dec.Attack)
 	}
@@ -100,22 +95,19 @@ func TestConnFlood_HysteresisNoEarlyRecover(t *testing.T) {
 	}
 }
 
-// TestConnFlood_HysteresisRecovery проверяет, что при падении ниже Low атака гасится.
 func TestConnFlood_HysteresisRecovery(t *testing.T) {
 	d := detector.New(testThresholds())
 
 	s := snap()
 	s.ConnRate = 50.0
-	d.Analyze(s) // → Critical
+	d.Analyze(s)
 
-	s.ConnRate = 3.0 // ниже Low=5
+	s.ConnRate = 3.0
 	dec := d.Analyze(s)
 	if dec.Attack != detector.AttackNone {
 		t.Errorf("want AttackNone after recovery, got %v / %v", dec.Attack, dec.Severity)
 	}
 }
-
-// --- JunkSession ---
 
 func TestJunkSession_Warning(t *testing.T) {
 	d := detector.New(testThresholds())
@@ -142,9 +134,9 @@ func TestJunkSession_HysteresisNoEarlyRecover(t *testing.T) {
 
 	s := snap()
 	s.WastedCmdRate = 20.0
-	d.Analyze(s) // → Critical
+	d.Analyze(s)
 
-	s.WastedCmdRate = 3.0 // выше Low=2, ниже Warn=5
+	s.WastedCmdRate = 3.0
 	dec := d.Analyze(s)
 	if dec.Attack != detector.AttackJunkSession {
 		t.Errorf("want JunkSession (hysteresis), got %v", dec.Attack)
@@ -158,19 +150,16 @@ func TestJunkSession_Recovery(t *testing.T) {
 	s.WastedCmdRate = 20.0
 	d.Analyze(s)
 
-	s.WastedCmdRate = 1.0 // ниже Low=2
+	s.WastedCmdRate = 1.0
 	dec := d.Analyze(s)
 	if dec.Attack != detector.AttackNone {
 		t.Errorf("want AttackNone after recovery, got %v", dec.Attack)
 	}
 }
 
-// --- SlowLoris ---
-
 func TestSlowLoris_NeedsBothConditions(t *testing.T) {
 	d := detector.New(testThresholds())
 
-	// Только ActiveSessions — недостаточно
 	s := snap()
 	s.ActiveSessions = 60
 	s.TimeoutRate = 0.0
@@ -179,7 +168,6 @@ func TestSlowLoris_NeedsBothConditions(t *testing.T) {
 		t.Error("want no SlowLoris: TimeoutRate too low")
 	}
 
-	// Только TimeoutRate — недостаточно
 	d = detector.New(testThresholds())
 	s.ActiveSessions = 0
 	s.TimeoutRate = 5.0
@@ -192,8 +180,8 @@ func TestSlowLoris_NeedsBothConditions(t *testing.T) {
 func TestSlowLoris_Warning(t *testing.T) {
 	d := detector.New(testThresholds())
 	s := snap()
-	s.ActiveSessions = 30  // >= warn=20, < crit=50
-	s.TimeoutRate = 2.0    // >= trigger=1.0
+	s.ActiveSessions = 30
+	s.TimeoutRate = 2.0
 	dec := d.Analyze(s)
 	if dec.Attack != detector.AttackSlowLoris || dec.Severity != detector.SeverityWarning {
 		t.Errorf("want SlowLoris/Warning, got %v/%v", dec.Attack, dec.Severity)
@@ -211,44 +199,38 @@ func TestSlowLoris_Critical(t *testing.T) {
 	}
 }
 
-// TestSlowLoris_RecoveryByEitherMetric проверяет, что восстановление происходит,
-// если хотя бы одна метрика падает ниже low-порога.
 func TestSlowLoris_RecoveryByEitherMetric(t *testing.T) {
-	// Восстановление через ActiveSessions
 	d := detector.New(testThresholds())
 	s := snap()
 	s.ActiveSessions = 60
 	s.TimeoutRate = 3.0
-	d.Analyze(s) // → Critical
+	d.Analyze(s)
 
-	s.ActiveSessions = 5 // ниже low=10
+	s.ActiveSessions = 5
 	s.TimeoutRate = 3.0
 	dec := d.Analyze(s)
 	if dec.Attack == detector.AttackSlowLoris {
 		t.Errorf("want recovery by ActiveSessions drop, got %v/%v", dec.Attack, dec.Severity)
 	}
 
-	// Восстановление через TimeoutRate
 	d = detector.New(testThresholds())
 	s.ActiveSessions = 60
 	s.TimeoutRate = 3.0
-	d.Analyze(s) // → Critical
+	d.Analyze(s)
 
 	s.ActiveSessions = 60
-	s.TimeoutRate = 0.2 // ниже low=0.5
+	s.TimeoutRate = 0.2
 	dec = d.Analyze(s)
 	if dec.Attack == detector.AttackSlowLoris {
 		t.Errorf("want recovery by TimeoutRate drop, got %v/%v", dec.Attack, dec.Severity)
 	}
 }
 
-// --- DictAttack ---
-
 func TestDictAttack_Warning(t *testing.T) {
 	d := detector.New(testThresholds())
 	s := snap()
 	s.NoqueueRate = 8.0
-	s.ConnRate = 2.0 // ниже max=10
+	s.ConnRate = 2.0
 	dec := d.Analyze(s)
 	if dec.Attack != detector.AttackDictAttack || dec.Severity != detector.SeverityWarning {
 		t.Errorf("want DictAttack/Warning, got %v/%v", dec.Attack, dec.Severity)
@@ -266,13 +248,11 @@ func TestDictAttack_Critical(t *testing.T) {
 	}
 }
 
-// TestDictAttack_SuppressedByHighConnRate проверяет, что при высоком ConnRate
-// атака классифицируется как connection_flood, а не dict_attack.
 func TestDictAttack_SuppressedByHighConnRate(t *testing.T) {
 	d := detector.New(testThresholds())
 	s := snap()
 	s.NoqueueRate = 20.0
-	s.ConnRate = 15.0 // выше max=10 → это connection_flood
+	s.ConnRate = 15.0
 	dec := d.Analyze(s)
 	if dec.Attack == detector.AttackDictAttack {
 		t.Error("want no DictAttack when ConnRate is high")
@@ -286,29 +266,24 @@ func TestDictAttack_Recovery(t *testing.T) {
 	s.ConnRate = 2.0
 	d.Analyze(s)
 
-	s.NoqueueRate = 1.0 // ниже low=2
+	s.NoqueueRate = 1.0
 	dec := d.Analyze(s)
 	if dec.Attack != detector.AttackNone {
 		t.Errorf("want AttackNone after recovery, got %v", dec.Attack)
 	}
 }
 
-// --- Приоритет ---
-
-// TestPriority_ConnFloodBeatsDict проверяет, что ConnectionFlood имеет приоритет над DictAttack.
 func TestPriority_ConnFloodBeatsDict(t *testing.T) {
 	d := detector.New(testThresholds())
 	s := snap()
-	s.ConnRate = 50.0    // → ConnectionFlood/Critical
-	s.NoqueueRate = 20.0 // → DictAttack (но ConnRate > max, поэтому не сработает)
-	// Но даже если оба сработают — ConnFlood имеет приоритет
+	s.ConnRate = 50.0
+	s.NoqueueRate = 20.0
 	dec := d.Analyze(s)
 	if dec.Attack != detector.AttackConnectionFlood {
 		t.Errorf("want AttackConnectionFlood (priority), got %v", dec.Attack)
 	}
 }
 
-// TestPriority_ConnFloodBeatsJunk проверяет, что ConnectionFlood имеет приоритет над JunkSession.
 func TestPriority_ConnFloodBeatsJunk(t *testing.T) {
 	d := detector.New(testThresholds())
 	s := snap()
@@ -319,8 +294,6 @@ func TestPriority_ConnFloodBeatsJunk(t *testing.T) {
 		t.Errorf("want AttackConnectionFlood (priority over JunkSession), got %v", dec.Attack)
 	}
 }
-
-// --- Thresholds: LoadFromFile ---
 
 func TestLoadFromFile_Valid(t *testing.T) {
 	yaml := `
@@ -346,7 +319,6 @@ connection_flood:
 	if th.ConnectionFlood.ConnRateCrit != 200.0 {
 		t.Errorf("want ConnRateCrit=200, got %v", th.ConnectionFlood.ConnRateCrit)
 	}
-	// Остальные поля должны взяться из DefaultThresholds
 	def := detector.DefaultThresholds()
 	if th.JunkSession.WastedCmdRateWarn != def.JunkSession.WastedCmdRateWarn {
 		t.Errorf("want default JunkSession.WastedCmdRateWarn=%v, got %v",
@@ -374,8 +346,6 @@ func TestLoadFromFile_InvalidYAML(t *testing.T) {
 		t.Error("want error for invalid YAML, got nil")
 	}
 }
-
-// --- String() методы ---
 
 func TestAttackTypeString(t *testing.T) {
 	cases := []struct {

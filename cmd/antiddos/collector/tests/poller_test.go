@@ -48,7 +48,6 @@ func TestCountQueuedSingle(t *testing.T) {
 }
 
 func TestCountQueuedNoHeader(t *testing.T) {
-	// Минимальный вывод без заголовка — только ID
 	out := "ABCDEF1234AB      100 Fri Apr 18 12:00:00  a@b.com\n"
 	n := collector.CountQueued(out)
 	if n != 1 {

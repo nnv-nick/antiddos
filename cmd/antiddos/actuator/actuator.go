@@ -11,9 +11,6 @@ import (
 	"github.com/nnv-nick/antiddos/cmd/antiddos/detector"
 )
 
-// Actuator применяет защитные меры Postfix через канал postfix-ctl.
-// Пишет /postfix-ctl/antiddos.cf и создаёт /postfix-ctl/reload,
-// который подхватывает watchdog внутри контейнера Postfix.
 type Actuator struct {
 	ctlDir       string
 	cfg          Config
@@ -22,8 +19,6 @@ type Actuator struct {
 	lastLines    []string
 }
 
-// New создаёт Actuator.
-// ctlDir — путь к директории канала управления (обычно /postfix-ctl).
 func New(ctlDir string, cfg Config) *Actuator {
 	return &Actuator{
 		ctlDir:   ctlDir,
@@ -32,17 +27,13 @@ func New(ctlDir string, cfg Config) *Actuator {
 	}
 }
 
-// Apply анализирует Decision и применяет соответствующую конфигурацию Postfix.
-// Идемпотентен: повторный вызов с теми же данными не перезаписывает файлы и не тригерит reload.
 func (a *Actuator) Apply(dec detector.Decision, snap collector.Snapshot) error {
-	// Обновляем базовую линию только в спокойный период
 	if dec.Attack == detector.AttackNone {
 		a.baseline.Update(snap.ConnRate)
 	}
 
 	lines := ComputeLines(dec, snap, a.baseline, a.cfg)
 
-	// Пропускаем, если decision и строки конфига не изменились
 	if dec == a.lastDecision && equalLines(lines, a.lastLines) {
 		return nil
 	}

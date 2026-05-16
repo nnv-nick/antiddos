@@ -1,6 +1,3 @@
-// antiddos — защитный сервис для Postfix.
-// Собирает метрики активности (collector), обнаруживает атаки (detector)
-// и применяет защитные меры (actuator).
 package main
 
 import (
@@ -34,7 +31,6 @@ func main() {
 
 	log.Printf("antiddos: log=%s metricsURL=%s ctlDir=%s interval=%s", *logPath, *metricsURL, *ctlDir, *interval)
 
-	// Загружаем пороги и конфиг actuator'а
 	detThresholds := detector.DefaultThresholds()
 	actConfig := actuator.DefaultConfig()
 	if *thresholdsPath != "" {
@@ -61,10 +57,8 @@ func main() {
 	d := detector.New(detThresholds)
 	a := actuator.New(*ctlDir, actConfig)
 
-	// Запускаем collector в фоне
 	go c.Run(ctx)
 
-	// Ждём первых данных
 	time.Sleep(2 * time.Second)
 
 	ticker := time.NewTicker(*interval)

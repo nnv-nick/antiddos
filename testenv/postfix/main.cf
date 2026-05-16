@@ -1,8 +1,3 @@
-# =============================================================
-#  Postfix — тестовая конфигурация (baseline)
-#  Намеренно мягкие лимиты — это базовый уровень без защиты.
-# =============================================================
-
 compatibility_level = 3.6
 
 myhostname = mail.test.local
@@ -11,48 +6,34 @@ myorigin = $mydomain
 inet_interfaces = all
 inet_protocols = ipv4
 
-# Принимаем почту для test.local
 mydestination =
 local_recipient_maps =
 relay_domains = test.local
 
-# Пересылаем на smtp-sink
 relayhost = [smtp-sink]:2525
 default_transport = smtp
 relay_transport = smtp
 
-# ---------- Очереди ----------
 queue_directory = /var/spool/postfix
 data_directory = /var/lib/postfix
 
-# ---------- Логирование ----------
 maillog_file = /var/log/mail.log
 
-# ---------- Лимиты (baseline — без ужесточений) ----------
-# Процессы: достаточно высокий лимит, чтобы slow_loris не мог исчерпать слоты
-# до срабатывания детектора. Actuator снижает per-IP лимит при атаке.
 default_process_limit = 100
 smtpd_client_connection_count_limit = 50
 smtpd_per_record_deadline = no
 
-# Rate limiting (отключён в baseline)
 smtpd_client_connection_rate_limit = 0
 smtpd_client_message_rate_limit = 0
 smtpd_client_recipient_rate_limit = 0
 
-# Лимиты внутри сессии
 smtpd_hard_error_limit = 20
-# after 3 errors, each response costs smtpd_error_sleep_time → slots held longer
 smtpd_soft_error_limit = 3
 smtpd_junk_command_limit = 100
 smtpd_error_sleep_time = 1s
 
-# Таймауты
 smtpd_timeout = 300s
 
-# ---------- Ограничения получателей ----------
-# relay_recipient_maps ограничивает допустимых получателей для relay_domains.
-# Адреса не из этого файла отклоняются с NOQUEUE — это даёт сигнал для dict_attack detector'а.
 relay_recipient_maps = hash:/etc/postfix/relay_recipients
 
 smtpd_recipient_restrictions =
@@ -60,6 +41,5 @@ smtpd_recipient_restrictions =
     reject_unlisted_recipient,
     permit
 
-# ---------- TLS (отключён для простоты тестирования) ----------
 smtpd_use_tls = no
 smtp_use_tls = no

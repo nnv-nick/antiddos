@@ -5,23 +5,18 @@ import (
 	"time"
 )
 
-// EventBuffer — потокобезопасное скользящее окно событий.
-// События старше window отсекаются при каждом обращении.
 type EventBuffer struct {
-	mu         sync.Mutex
-	events     []Event
-	window     time.Duration
-	lastDepth  int
-	hasDepth   bool
+	mu        sync.Mutex
+	events    []Event
+	window    time.Duration
+	lastDepth int
+	hasDepth  bool
 }
 
-// NewEventBuffer создаёт буфер с заданным окном наблюдения.
 func NewEventBuffer(window time.Duration) *EventBuffer {
 	return &EventBuffer{window: window}
 }
 
-// Add добавляет событие в буфер.
-// EvQueueDepth не хранится в слайсе — только обновляет lastDepth.
 func (b *EventBuffer) Add(e Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -33,7 +28,6 @@ func (b *EventBuffer) Add(e Event) {
 	b.events = append(b.events, e)
 }
 
-// Snapshot вычисляет текущие агрегаты по событиям внутри окна.
 func (b *EventBuffer) Snapshot() Snapshot {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -70,11 +64,8 @@ func (b *EventBuffer) Snapshot() Snapshot {
 	}
 }
 
-// trim удаляет события старше window. Вызывается под мьютексом.
-// Не предполагает сортировку событий по времени.
 func (b *EventBuffer) trim() {
 	cutoff := time.Now().Add(-b.window)
-	// Переиспользуем backing array: пишем в начало, читая с текущей позиции.
 	out := b.events[:0]
 	for _, e := range b.events {
 		if e.At.After(cutoff) {

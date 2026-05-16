@@ -21,11 +21,9 @@ func TestBufferConnRate(t *testing.T) {
 	buf := collector.NewEventBuffer(window)
 	now := time.Now()
 
-	// 5 соединений внутри окна
 	for i := 0; i < 5; i++ {
 		buf.Add(collector.Event{At: now.Add(-time.Duration(i) * time.Second), Type: collector.EvConnect})
 	}
-	// 1 соединение за пределами окна
 	buf.Add(collector.Event{At: now.Add(-20 * time.Second), Type: collector.EvConnect})
 
 	s := buf.Snapshot()
@@ -45,7 +43,6 @@ func TestBufferActiveSessions(t *testing.T) {
 	buf.Add(collector.Event{At: now.Add(-3 * time.Second), Type: collector.EvDisconnect, Commands: 5, Mail: 1})
 
 	s := buf.Snapshot()
-	// 3 connect - 1 disconnect = 2 активных
 	if s.ActiveSessions != 2 {
 		t.Errorf("ActiveSessions = %d, want 2", s.ActiveSessions)
 	}
@@ -87,11 +84,8 @@ func TestBufferWastedCmdRate(t *testing.T) {
 	buf := collector.NewEventBuffer(window)
 	now := time.Now()
 
-	// Мусорная сессия: 15 команд, mail=0
 	buf.Add(collector.Event{At: now.Add(-1 * time.Second), Type: collector.EvDisconnect, Commands: 15, Mail: 0})
-	// Легитимная сессия: 5 команд, mail=1 — не должна войти в wasted
 	buf.Add(collector.Event{At: now.Add(-2 * time.Second), Type: collector.EvDisconnect, Commands: 5, Mail: 1})
-	// Ещё одна мусорная: 50 команд, mail=0
 	buf.Add(collector.Event{At: now.Add(-3 * time.Second), Type: collector.EvDisconnect, Commands: 50, Mail: 0})
 
 	s := buf.Snapshot()
@@ -102,7 +96,6 @@ func TestBufferWastedCmdRate(t *testing.T) {
 }
 
 func TestBufferWastedCmdZeroCommands(t *testing.T) {
-	// disconnect с commands=0 не должен влиять на wasted_cmd_rate
 	buf := collector.NewEventBuffer(30 * time.Second)
 	buf.Add(collector.Event{At: time.Now(), Type: collector.EvDisconnect, Commands: 0, Mail: 0})
 
@@ -121,7 +114,6 @@ func TestBufferQueueDepth(t *testing.T) {
 		t.Errorf("QueueDepth = %d, want 42", s.QueueDepth)
 	}
 
-	// Новое значение перезаписывает старое
 	buf.Add(collector.Event{At: time.Now(), Type: collector.EvQueueDepth, Depth: 7})
 	s = buf.Snapshot()
 	if s.QueueDepth != 7 {
@@ -130,7 +122,6 @@ func TestBufferQueueDepth(t *testing.T) {
 }
 
 func TestBufferQueueDepthNotCountedInRates(t *testing.T) {
-	// EvQueueDepth не должен влиять на conn_rate / wasted_cmd_rate
 	buf := collector.NewEventBuffer(30 * time.Second)
 	buf.Add(collector.Event{At: time.Now(), Type: collector.EvQueueDepth, Depth: 10})
 
@@ -145,9 +136,7 @@ func TestBufferTrimExpiredEvents(t *testing.T) {
 	buf := collector.NewEventBuffer(window)
 	now := time.Now()
 
-	// Событие за пределами окна — должно быть отброшено
 	buf.Add(collector.Event{At: now.Add(-10 * time.Second), Type: collector.EvConnect})
-	// Событие внутри окна
 	buf.Add(collector.Event{At: now.Add(-1 * time.Second), Type: collector.EvConnect})
 
 	s := buf.Snapshot()

@@ -14,22 +14,16 @@ import (
 	"time"
 )
 
-// reQueueEntry соответствует строкам с ID сообщения в выводе postqueue -p.
 var reQueueEntry = regexp.MustCompile(`(?m)^[A-F0-9]{10,}[* ]\s`)
 
-// reQueueDepthMetric находит значение postfix_queue_depth в Prometheus text format.
 var reQueueDepthMetric = regexp.MustCompile(`(?m)^postfix_queue_depth\s+(\S+)`)
 
-// QueuePoller периодически запрашивает глубину очереди и кладёт результат
-// в буфер как EvQueueDepth. Способ получения задаётся через depthFn.
 type QueuePoller struct {
 	depthFn  func() (int, error)
 	interval time.Duration
 	buf      *EventBuffer
 }
 
-// NewQueuePollerExec создаёт poller, запускающий postqueue напрямую.
-// Используется когда antiddos запущен на том же хосте, что и Postfix.
 func NewQueuePollerExec(bin string, interval time.Duration, buf *EventBuffer) *QueuePoller {
 	return &QueuePoller{
 		interval: interval,
@@ -44,8 +38,6 @@ func NewQueuePollerExec(bin string, interval time.Duration, buf *EventBuffer) *Q
 	}
 }
 
-// NewQueuePollerHTTP создаёт poller, читающий глубину очереди из метрик
-// postfix-exporter по HTTP. Используется в контейнерном окружении.
 func NewQueuePollerHTTP(metricsURL string, interval time.Duration, buf *EventBuffer) *QueuePoller {
 	client := &http.Client{Timeout: 3 * time.Second}
 	return &QueuePoller{
@@ -55,7 +47,6 @@ func NewQueuePollerHTTP(metricsURL string, interval time.Duration, buf *EventBuf
 	}
 }
 
-// Run запускает цикл опроса. Блокирует до отмены ctx.
 func (p *QueuePoller) Run(ctx context.Context) {
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
@@ -78,7 +69,6 @@ func (p *QueuePoller) poll() {
 	p.buf.Add(Event{At: time.Now(), Type: EvQueueDepth, Depth: depth})
 }
 
-// fetchQueueDepth читает /metrics с postfix-exporter и парсит postfix_queue_depth.
 func fetchQueueDepth(client *http.Client, url string) (int, error) {
 	resp, err := client.Get(url)
 	if err != nil {
@@ -93,20 +83,18 @@ func fetchQueueDepth(client *http.Client, url string) (int, error) {
 
 	m := reQueueDepthMetric.FindSubmatch(body)
 	if m == nil {
-		return 0, nil // метрика ещё не появилась (нет писем) — 0
+		return 0, nil
 	}
 	v, err := strconv.ParseFloat(string(m[1]), 64)
 	if err != nil {
 		return 0, fmt.Errorf("parse postfix_queue_depth %q: %w", m[1], err)
 	}
 	if v < 0 {
-		return 0, nil // gauge может уйти в минус при рестарте exporter'а
+		return 0, nil
 	}
 	return int(v), nil
 }
 
-// ParseQueueDepthFromMetrics парсит значение postfix_queue_depth из Prometheus
-// text format. Экспортируется для тестирования.
 func ParseQueueDepthFromMetrics(body string) (int, bool) {
 	scanner := bufio.NewScanner(strings.NewReader(body))
 	for scanner.Scan() {
@@ -133,8 +121,6 @@ func ParseQueueDepthFromMetrics(body string) (int, bool) {
 	return 0, false
 }
 
-// CountQueued подсчитывает число сообщений в выводе "postqueue -p".
-// Экспортируется для тестирования.
 func CountQueued(out string) int {
 	if strings.Contains(out, "Mail queue is empty") {
 		return 0

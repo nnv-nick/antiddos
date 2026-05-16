@@ -22,7 +22,6 @@ func TestParseLineConnect(t *testing.T) {
 }
 
 func TestParseLineDisconnectFull(t *testing.T) {
-	// Легитимная сессия: mail=1
 	line := "Apr 18 12:00:02 mail postfix/smtpd[1234]: disconnect from unknown[172.20.0.5] ehlo=1 mail=1 rcpt=1 data=1 quit=1 commands=5"
 	e, ok := collector.ParseLine(line)
 	if !ok {
@@ -40,7 +39,6 @@ func TestParseLineDisconnectFull(t *testing.T) {
 }
 
 func TestParseLineDisconnectJunkEhlo(t *testing.T) {
-	// EHLO-спам: commands=50, mail=0
 	line := "Apr 18 12:00:03 mail postfix/smtpd[1234]: disconnect from unknown[172.20.0.5] ehlo=50 commands=50"
 	e, ok := collector.ParseLine(line)
 	if !ok {
@@ -55,7 +53,6 @@ func TestParseLineDisconnectJunkEhlo(t *testing.T) {
 }
 
 func TestParseLineDisconnectJunkUnknown(t *testing.T) {
-	// XJUNK-спам: unknown=14, mail=0
 	line := "Apr 18 12:00:04 mail postfix/smtpd[1234]: disconnect from unknown[172.20.0.5] ehlo=1 unknown=14 commands=15"
 	e, ok := collector.ParseLine(line)
 	if !ok {
@@ -70,9 +67,6 @@ func TestParseLineDisconnectJunkUnknown(t *testing.T) {
 }
 
 func TestParseLineDisconnectXYFormat(t *testing.T) {
-	// Postfix 3.x логирует X/Y для команд: X — успешных, Y — всего.
-	// Реальная строка при XJUNK-атаке: quit=1 unknown=0/3 commands=1/4
-	// Нас интересует total (Y=4), а не успешных (X=1).
 	line := "May 01 10:53:30 mail postfix/smtpd[7135]: disconnect from unknown[127.0.0.1] quit=1 unknown=0/3 commands=1/4"
 	e, ok := collector.ParseLine(line)
 	if !ok {
@@ -117,7 +111,6 @@ func TestParseLineNonSmtp(t *testing.T) {
 	if !ok {
 		t.Fatal("expected ok=true")
 	}
-	// non-SMTP трактуем как мусорный disconnect
 	if e.Type != collector.EvDisconnect {
 		t.Errorf("type = %v, want EvDisconnect", e.Type)
 	}

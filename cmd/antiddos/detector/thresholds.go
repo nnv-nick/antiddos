@@ -1,4 +1,3 @@
-// Package detector анализирует Snapshot от collector'а и классифицирует атаки.
 package detector
 
 import (
@@ -7,41 +6,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ConnectionFloodThresholds — пороги для детекции флуда соединениями.
 type ConnectionFloodThresholds struct {
-	ConnRateWarn float64 `yaml:"conn_rate_warn"` // новых соединений/с → Warning
-	ConnRateCrit float64 `yaml:"conn_rate_crit"` // новых соединений/с → Critical
-	ConnRateLow  float64 `yaml:"conn_rate_low"`  // гистерезис: возврат в Normal
+	ConnRateWarn float64 `yaml:"conn_rate_warn"`
+	ConnRateCrit float64 `yaml:"conn_rate_crit"`
+	ConnRateLow  float64 `yaml:"conn_rate_low"`
 }
 
-// JunkSessionThresholds — пороги для детекции мусорных сессий.
 type JunkSessionThresholds struct {
-	WastedCmdRateWarn float64 `yaml:"wasted_cmd_rate_warn"` // команд в сессиях mail=0, /с → Warning
-	WastedCmdRateCrit float64 `yaml:"wasted_cmd_rate_crit"` // → Critical
-	WastedCmdRateLow  float64 `yaml:"wasted_cmd_rate_low"`  // гистерезис
+	WastedCmdRateWarn float64 `yaml:"wasted_cmd_rate_warn"`
+	WastedCmdRateCrit float64 `yaml:"wasted_cmd_rate_crit"`
+	WastedCmdRateLow  float64 `yaml:"wasted_cmd_rate_low"`
 }
 
-// SlowLorisThresholds — пороги для детекции slow loris.
-// Обе метрики (active_sessions И timeout_rate) должны превышать пороги для срабатывания.
-// Для восстановления достаточно, чтобы хоть одна упала ниже low-порога.
 type SlowLorisThresholds struct {
-	ActiveSessionsWarn int     `yaml:"active_sessions_warn"` // активных сессий → Warning
-	ActiveSessionsCrit int     `yaml:"active_sessions_crit"` // → Critical
-	ActiveSessionsLow  int     `yaml:"active_sessions_low"`  // гистерезис
-	TimeoutRateTrigger float64 `yaml:"timeout_rate_trigger"` // вторичное условие: таймаутов/с
-	TimeoutRateLow     float64 `yaml:"timeout_rate_low"`     // гистерезис для вторичного условия
+	ActiveSessionsWarn int     `yaml:"active_sessions_warn"`
+	ActiveSessionsCrit int     `yaml:"active_sessions_crit"`
+	ActiveSessionsLow  int     `yaml:"active_sessions_low"`
+	TimeoutRateTrigger float64 `yaml:"timeout_rate_trigger"`
+	TimeoutRateLow     float64 `yaml:"timeout_rate_low"`
 }
 
-// DictAttackThresholds — пороги для детекции перебора получателей.
-// Срабатывает при высоком NoqueueRate И умеренном ConnRate (иначе — connection_flood).
 type DictAttackThresholds struct {
-	NoqueueRateWarn float64 `yaml:"noqueue_rate_warn"` // NOQUEUE-отказов/с → Warning
-	NoqueueRateCrit float64 `yaml:"noqueue_rate_crit"` // → Critical
-	NoqueueRateLow  float64 `yaml:"noqueue_rate_low"`  // гистерезис
-	ConnRateMax     float64 `yaml:"conn_rate_max"`     // выше этого — connection_flood, не dict_attack
+	NoqueueRateWarn float64 `yaml:"noqueue_rate_warn"`
+	NoqueueRateCrit float64 `yaml:"noqueue_rate_crit"`
+	NoqueueRateLow  float64 `yaml:"noqueue_rate_low"`
+	ConnRateMax     float64 `yaml:"conn_rate_max"`
 }
 
-// Thresholds — все пороги для всех типов атак.
 type Thresholds struct {
 	ConnectionFlood ConnectionFloodThresholds `yaml:"connection_flood"`
 	JunkSession     JunkSessionThresholds     `yaml:"junk_session"`
@@ -49,8 +40,6 @@ type Thresholds struct {
 	DictAttack      DictAttackThresholds      `yaml:"dict_attack"`
 }
 
-// DefaultThresholds возвращает пороги по умолчанию, настроенные для тестовой среды
-// с легитимным трафиком ~2 письма/с.
 func DefaultThresholds() Thresholds {
 	return Thresholds{
 		ConnectionFlood: ConnectionFloodThresholds{
@@ -79,8 +68,6 @@ func DefaultThresholds() Thresholds {
 	}
 }
 
-// LoadFromFile загружает пороги из YAML-файла.
-// Поля, не указанные в файле, берутся из DefaultThresholds().
 func LoadFromFile(path string) (Thresholds, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

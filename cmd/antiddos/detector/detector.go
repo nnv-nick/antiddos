@@ -6,17 +6,16 @@ import (
 	"github.com/nnv-nick/antiddos/cmd/antiddos/collector"
 )
 
-// AttackType классифицирует тип обнаруженной атаки.
 type AttackType int
 
 const (
 	AttackNone           AttackType = iota
-	AttackConnectionFlood           // флуд соединениями
-	AttackJunkSession               // мусорные сессии (mail=0)
-	AttackSlowLoris                 // медленные соединения
-	AttackDictAttack                // перебор получателей
+	AttackConnectionFlood
+	AttackJunkSession
+	AttackSlowLoris
+	AttackDictAttack
 
-	attackTypeCount // sentinel для размера массива
+	attackTypeCount
 )
 
 func (a AttackType) String() string {
@@ -34,13 +33,12 @@ func (a AttackType) String() string {
 	}
 }
 
-// Severity описывает серьёзность обнаруженной атаки.
 type Severity int
 
 const (
 	SeverityNormal   Severity = iota
-	SeverityWarning           // метрика превысила мягкий порог
-	SeverityCritical          // метрика превысила жёсткий порог
+	SeverityWarning
+	SeverityCritical
 )
 
 func (s Severity) String() string {
@@ -54,31 +52,21 @@ func (s Severity) String() string {
 	}
 }
 
-// Decision — результат анализа одного Snapshot.
 type Decision struct {
 	Attack   AttackType
 	Severity Severity
 }
 
-// Detector анализирует Snapshot'ы и классифицирует атаки с гистерезисом.
-// Гистерезис предотвращает флаппинг: атака начинается при превышении высокого порога,
-// а завершается только когда метрика опускается ниже низкого (Low) порога.
-//
-// Приоритет при одновременном срабатывании нескольких типов:
-// ConnectionFlood > SlowLoris > JunkSession > DictAttack.
 type Detector struct {
 	t      Thresholds
 	mu     sync.Mutex
-	states [attackTypeCount]Severity // текущее состояние по каждому типу атаки
+	states [attackTypeCount]Severity
 }
 
-// New создаёт Detector с заданными порогами.
 func New(t Thresholds) *Detector {
 	return &Detector{t: t}
 }
 
-// Analyze анализирует Snapshot и возвращает Decision.
-// Метод потокобезопасен.
 func (d *Detector) Analyze(s collector.Snapshot) Decision {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -88,7 +76,6 @@ func (d *Detector) Analyze(s collector.Snapshot) Decision {
 	d.states[AttackSlowLoris] = d.slowLorisSeverity(s)
 	d.states[AttackDictAttack] = d.dictAttackSeverity(s)
 
-	// Возвращаем атаку с наибольшим приоритетом среди ненормальных
 	for _, at := range []AttackType{
 		AttackConnectionFlood,
 		AttackSlowLoris,
@@ -102,7 +89,6 @@ func (d *Detector) Analyze(s collector.Snapshot) Decision {
 	return Decision{}
 }
 
-// connFloodSeverity вычисляет severity для connection_flood с гистерезисом.
 func (d *Detector) connFloodSeverity(s collector.Snapshot) Severity {
 	t := d.t.ConnectionFlood
 	cur := d.states[AttackConnectionFlood]
@@ -134,7 +120,6 @@ func (d *Detector) connFloodSeverity(s collector.Snapshot) Severity {
 	}
 }
 
-// junkSessionSeverity вычисляет severity для junk_session с гистерезисом.
 func (d *Detector) junkSessionSeverity(s collector.Snapshot) Severity {
 	t := d.t.JunkSession
 	cur := d.states[AttackJunkSession]
@@ -166,9 +151,6 @@ func (d *Detector) junkSessionSeverity(s collector.Snapshot) Severity {
 	}
 }
 
-// slowLorisSeverity вычисляет severity для slow_loris с гистерезисом.
-// Для срабатывания нужны оба условия: ActiveSessions И TimeoutRate выше порогов.
-// Для восстановления достаточно, чтобы хотя бы одна метрика упала ниже low-порога.
 func (d *Detector) slowLorisSeverity(s collector.Snapshot) Severity {
 	t := d.t.SlowLoris
 	cur := d.states[AttackSlowLoris]
@@ -203,12 +185,9 @@ func (d *Detector) slowLorisSeverity(s collector.Snapshot) Severity {
 	}
 }
 
-// dictAttackSeverity вычисляет severity для dict_attack с гистерезисом.
-// Если ConnRate выше ConnRateMax — это connection_flood, а не dict_attack.
 func (d *Detector) dictAttackSeverity(s collector.Snapshot) Severity {
 	t := d.t.DictAttack
 
-	// Высокий ConnRate означает connection_flood — не смешиваем типы
 	if s.ConnRate >= t.ConnRateMax {
 		return SeverityNormal
 	}

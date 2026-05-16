@@ -13,10 +13,9 @@ import (
 	"github.com/nnv-nick/antiddos/cmd/antiddos/detector"
 )
 
-// testConfig возвращает Config с удобными числами для предсказуемых тестов.
 func testConfig() actuator.Config {
 	return actuator.Config{
-		BaselineAlpha: 1.0, // α=1: EMA = последнее значение (удобно для тестов)
+		BaselineAlpha: 1.0,
 		ConnectionFlood: actuator.ConnectionFloodActConfig{
 			RateLimitMultiplierWarn: 2.0,
 			RateLimitMultiplierCrit: 1.0,
@@ -48,8 +47,6 @@ func dec(attack detector.AttackType, sev detector.Severity) detector.Decision {
 	return detector.Decision{Attack: attack, Severity: sev}
 }
 
-// --- EMABaseline ---
-
 func TestBaseline_FirstValue(t *testing.T) {
 	b := actuator.NewEMABaseline(0.5)
 	if b.Initialized() {
@@ -66,8 +63,8 @@ func TestBaseline_FirstValue(t *testing.T) {
 
 func TestBaseline_EMA(t *testing.T) {
 	b := actuator.NewEMABaseline(0.5)
-	b.Update(10.0) // init: ConnRate=10
-	b.Update(20.0) // EMA: 0.5*20 + 0.5*10 = 15
+	b.Update(10.0)
+	b.Update(20.0)
 	want := 15.0
 	if math.Abs(b.ConnRate-want) > 1e-9 {
 		t.Errorf("want ConnRate=%.2f, got %.2f", want, b.ConnRate)
@@ -75,7 +72,7 @@ func TestBaseline_EMA(t *testing.T) {
 }
 
 func TestBaseline_MultipleUpdates(t *testing.T) {
-	b := actuator.NewEMABaseline(1.0) // α=1: всегда = последнее значение
+	b := actuator.NewEMABaseline(1.0)
 	b.Update(5.0)
 	b.Update(7.0)
 	b.Update(3.0)
@@ -83,8 +80,6 @@ func TestBaseline_MultipleUpdates(t *testing.T) {
 		t.Errorf("want ConnRate=3.0 with α=1, got %.2f", b.ConnRate)
 	}
 }
-
-// --- ComputeLines: Normal ---
 
 func TestComputeLines_Normal_ReturnsDefaults(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
@@ -103,12 +98,9 @@ func TestComputeLines_Normal_ReturnsDefaults(t *testing.T) {
 	}
 }
 
-// --- ComputeLines: ConnectionFlood ---
-
-// TestComputeLines_ConnFlood_Warning: baseline=2/s, mult=2.0 → limit=ceil(2*60*2)=240
 func TestComputeLines_ConnFlood_Warning(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
-	b.Update(2.0) // baseline ConnRate = 2/s
+	b.Update(2.0)
 
 	lines := actuator.ComputeLines(dec(detector.AttackConnectionFlood, detector.SeverityWarning), snap(), b, testConfig())
 	want := "smtpd_client_connection_rate_limit = 240"
@@ -117,7 +109,6 @@ func TestComputeLines_ConnFlood_Warning(t *testing.T) {
 	}
 }
 
-// TestComputeLines_ConnFlood_Critical: baseline=2/s, mult=1.0 → limit=ceil(2*60*1)=120
 func TestComputeLines_ConnFlood_Critical(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
 	b.Update(2.0)
@@ -129,10 +120,9 @@ func TestComputeLines_ConnFlood_Critical(t *testing.T) {
 	}
 }
 
-// TestComputeLines_ConnFlood_MinClamp: baseline почти ноль → должен применяться RateLimitMin.
 func TestComputeLines_ConnFlood_MinClamp(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
-	b.Update(0.01) // baseline почти ноль → ceil(0.01*60*2)=2, ниже min=5
+	b.Update(0.01)
 
 	lines := actuator.ComputeLines(dec(detector.AttackConnectionFlood, detector.SeverityWarning), snap(), b, testConfig())
 	want := "smtpd_client_connection_rate_limit = 5"
@@ -140,8 +130,6 @@ func TestComputeLines_ConnFlood_MinClamp(t *testing.T) {
 		t.Errorf("want %q (min clamp), got %v", want, lines)
 	}
 }
-
-// --- ComputeLines: SlowLoris ---
 
 func TestComputeLines_SlowLoris_Warning(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
@@ -169,8 +157,6 @@ func TestComputeLines_SlowLoris_Critical(t *testing.T) {
 	}
 }
 
-// --- ComputeLines: JunkSession ---
-
 func TestComputeLines_JunkSession_Warning(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
 	lines := actuator.ComputeLines(dec(detector.AttackJunkSession, detector.SeverityWarning), snap(), b, testConfig())
@@ -189,9 +175,6 @@ func TestComputeLines_JunkSession_Critical(t *testing.T) {
 	}
 }
 
-// --- ComputeLines: DictAttack ---
-
-// TestComputeLines_DictAttack_Proportional: noqueue=20/s, divisor=5 → sleep=ceil(4)=4
 func TestComputeLines_DictAttack_Proportional(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
 	s := snap()
@@ -204,7 +187,6 @@ func TestComputeLines_DictAttack_Proportional(t *testing.T) {
 	}
 }
 
-// TestComputeLines_DictAttack_MaxClamp: noqueue=100/s → sleep=ceil(20), clamp к max=10
 func TestComputeLines_DictAttack_MaxClamp(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
 	s := snap()
@@ -217,7 +199,6 @@ func TestComputeLines_DictAttack_MaxClamp(t *testing.T) {
 	}
 }
 
-// TestComputeLines_DictAttack_MinClamp: noqueue=0.1/s → ceil(0.02)=1, clamp к min=1
 func TestComputeLines_DictAttack_MinClamp(t *testing.T) {
 	b := actuator.NewEMABaseline(1.0)
 	s := snap()
@@ -230,9 +211,6 @@ func TestComputeLines_DictAttack_MinClamp(t *testing.T) {
 	}
 }
 
-// --- Actuator.Apply ---
-
-// newActuatorInTempDir создаёт Actuator в временной директории и возвращает путь.
 func newActuatorInTempDir(t *testing.T) (*actuator.Actuator, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -249,7 +227,6 @@ func TestActuator_Apply_WritesFiles(t *testing.T) {
 		t.Fatalf("Apply: %v", err)
 	}
 
-	// antiddos.cf должен существовать
 	cfPath := filepath.Join(dir, "antiddos.cf")
 	data, err := os.ReadFile(cfPath)
 	if err != nil {
@@ -259,7 +236,6 @@ func TestActuator_Apply_WritesFiles(t *testing.T) {
 		t.Errorf("antiddos.cf missing expected content:\n%s", data)
 	}
 
-	// reload-файл должен существовать
 	reloadPath := filepath.Join(dir, "reload")
 	if _, err := os.Stat(reloadPath); err != nil {
 		t.Fatalf("reload not created: %v", err)
@@ -277,7 +253,6 @@ func TestActuator_Apply_Idempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Удаляем reload, чтобы проверить, что второй Apply его не создаёт заново
 	reloadPath := filepath.Join(dir, "reload")
 	os.Remove(reloadPath)
 
@@ -296,16 +271,13 @@ func TestActuator_Apply_ReappliesOnDecisionChange(t *testing.T) {
 	s := snap()
 	s.ConnRate = 2.0
 
-	// Первый Apply — Normal
 	if err := a.Apply(dec(detector.AttackNone, detector.SeverityNormal), s); err != nil {
 		t.Fatal(err)
 	}
 
-	// Удаляем reload
 	reloadPath := filepath.Join(dir, "reload")
 	os.Remove(reloadPath)
 
-	// Второй Apply — AttackConnectionFlood → должен записать заново
 	if err := a.Apply(dec(detector.AttackConnectionFlood, detector.SeverityWarning), s); err != nil {
 		t.Fatal(err)
 	}
@@ -319,27 +291,22 @@ func TestActuator_Apply_ReappliesOnDecisionChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// При connection_flood Warning: baseline=2/s, mult=2 → limit=240
 	if !strings.Contains(string(data), "smtpd_client_connection_rate_limit = 240") {
 		t.Errorf("want connection rate limit in config, got:\n%s", data)
 	}
 }
 
-// TestActuator_Apply_BaselineUpdatedOnNormal проверяет, что baseline обновляется при Normal.
 func TestActuator_Apply_BaselineUpdatedOnNormal(t *testing.T) {
 	a, _ := newActuatorInTempDir(t)
 
-	// α=1.0, поэтому EMA = последнее значение
 	s := snap()
 	s.ConnRate = 5.0
 	a.Apply(dec(detector.AttackNone, detector.SeverityNormal), s) //nolint
 
-	// После установки baseline, атака connection_flood → ожидаем limit = ceil(5*60*2)=600
 	s2 := snap()
 	s2.ConnRate = 5.0
 
 	a2, dir2 := newActuatorInTempDir(t)
-	// Предварительно устанавливаем baseline через Apply Normal
 	sBase := snap()
 	sBase.ConnRate = 5.0
 	a2.Apply(dec(detector.AttackNone, detector.SeverityNormal), sBase) //nolint
@@ -355,28 +322,21 @@ func TestActuator_Apply_BaselineUpdatedOnNormal(t *testing.T) {
 	}
 }
 
-// TestActuator_Apply_BaselineNotUpdatedDuringAttack проверяет, что baseline
-// не меняется, пока идёт атака (ConnRate во время атаки не репрезентативен).
 func TestActuator_Apply_BaselineNotUpdatedDuringAttack(t *testing.T) {
 	a, dir := newActuatorInTempDir(t)
 
-	// Устанавливаем baseline = 2/s
 	sNormal := snap()
 	sNormal.ConnRate = 2.0
 	a.Apply(dec(detector.AttackNone, detector.SeverityNormal), sNormal) //nolint
 
-	// Идёт атака: высокий ConnRate — baseline НЕ должен обновиться
 	sAttack := snap()
 	sAttack.ConnRate = 500.0
 	a.Apply(dec(detector.AttackConnectionFlood, detector.SeverityWarning), sAttack) //nolint
 
-	// Атака прекратилась — возврат к Normal → ожидаем дефолты с limit=0
 	sRecovered := snap()
 	sRecovered.ConnRate = 2.0
 	a.Apply(dec(detector.AttackNone, detector.SeverityNormal), sRecovered) //nolint
 
-	// Теперь снова атака — baseline всё ещё должен быть ~2/s (не 500)
-	// Удаляем reload от предыдущего Apply
 	os.Remove(filepath.Join(dir, "reload"))
 
 	sAttack2 := snap()
@@ -384,13 +344,10 @@ func TestActuator_Apply_BaselineNotUpdatedDuringAttack(t *testing.T) {
 	a.Apply(dec(detector.AttackConnectionFlood, detector.SeverityWarning), sAttack2) //nolint
 
 	data, _ := os.ReadFile(filepath.Join(dir, "antiddos.cf"))
-	// С baseline~=2/s (после EMA: 1.0*2+0*500=2, потом 1.0*2=2) limit=ceil(2*60*2)=240
 	if !strings.Contains(string(data), "smtpd_client_connection_rate_limit = 240") {
 		t.Errorf("baseline should not be updated during attack, got:\n%s", data)
 	}
 }
-
-// --- LoadConfigFromFile ---
 
 func TestLoadConfigFromFile_Valid(t *testing.T) {
 	yaml := `
@@ -418,7 +375,6 @@ actuator:
 	if cfg.ConnectionFlood.RateLimitMultiplierWarn != 3.0 {
 		t.Errorf("want RateLimitMultiplierWarn=3.0, got %v", cfg.ConnectionFlood.RateLimitMultiplierWarn)
 	}
-	// Не указанные поля берутся из DefaultConfig
 	def := actuator.DefaultConfig()
 	if cfg.SlowLoris.TimeoutWarnSec != def.SlowLoris.TimeoutWarnSec {
 		t.Errorf("want default TimeoutWarnSec=%d, got %d",
@@ -433,8 +389,6 @@ func TestLoadConfigFromFile_NotFound(t *testing.T) {
 	}
 }
 
-// TestLoadConfigFromFile_IgnoresDetectorKeys проверяет, что YAML с ключами detector'а
-// (connection_flood на верхнем уровне) парсится без ошибок.
 func TestLoadConfigFromFile_IgnoresDetectorKeys(t *testing.T) {
 	yaml := `
 connection_flood:
@@ -460,7 +414,6 @@ actuator:
 	}
 }
 
-// equalLines — вспомогательная функция для сравнения слайсов строк.
 func equalLines(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

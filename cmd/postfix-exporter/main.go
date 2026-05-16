@@ -1,6 +1,3 @@
-// postfix-exporter — минимальный Prometheus-экспортер для Postfix.
-// Тейлит /var/log/mail.log и считает ключевые события.
-// Не требует CGO и системных библиотек.
 package main
 
 import (
@@ -17,7 +14,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Паттерны строк Postfix mail.log
 var (
 	reConnect    = regexp.MustCompile(`postfix/smtpd\[\d+\]: connect from `)
 	reDisconnect = regexp.MustCompile(`postfix/smtpd\[\d+\]: disconnect from `)
@@ -122,8 +118,6 @@ func processLine(line string) {
 	}
 }
 
-// tailLog тейлит файл: читает с конца и следит за новыми строками.
-// При ротации лога (файл стал короче) начинает сначала.
 func tailLog(path string) {
 	var (
 		file   *os.File
@@ -143,7 +137,6 @@ func tailLog(path string) {
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			// Стартуем с конца — не читаем историю
 			offset, _ = file.Seek(0, io.SeekEnd)
 			reader = bufio.NewReader(file)
 			log.Printf("tailing %s from offset %d", path, offset)
@@ -159,14 +152,12 @@ func tailLog(path string) {
 		buf += line
 
 		if err == nil {
-			// Полная строка
 			processLine(buf)
 			buf = ""
 			continue
 		}
 
 		if err == io.EOF {
-			// Проверяем, не сократился ли файл (ротация)
 			info, statErr := os.Stat(path)
 			if statErr == nil {
 				cur, _ := file.Seek(0, io.SeekCurrent)
