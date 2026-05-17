@@ -22,4 +22,4 @@ phases:
     attack:
       type: connection_flood
       workers: 15
-      rate_per_sec: 40
+      rate_per_sec: 30

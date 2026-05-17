@@ -4,7 +4,6 @@
 
 ```bash
 # 1. Поднять инфраструктуру (Postfix, prometheus, grafana, legit-sender)
-cd testenv
 docker compose up -d
 
 # 2. Открыть Grafana: http://localhost:3000  (admin / admin)
@@ -13,20 +12,6 @@ docker compose up -d
 # 3. Запустить сценарий атаки
 docker compose run --rm attacker --scenario /scenarios/baseline.yaml
 docker compose run --rm attacker --scenario /scenarios/s1_vector_switch.yaml
-
-# 4. Собрать отчёт (после теста)
-cd report
-pip install -r requirements.txt
-python3 report.py \
-    --prometheus http://localhost:9090 \
-    --start "2024-01-01T10:00:00Z" \
-    --end   "2024-01-01T10:30:00Z" \
-    --scenario s1_vector_switch \
-    --label baseline \
-    --out ./results
-
-# 5. Сравнительный отчёт (после нескольких прогонов с разными --label)
-python3 report.py --scenario s1_vector_switch --compare --out ./results
 ```
 
 ## Сценарии
@@ -42,7 +27,7 @@ python3 report.py --scenario s1_vector_switch --compare --out ./results
 | `s2_escalation.yaml` | **Смена вектора** | Тихая атака → внезапный рост ×5 |
 | `s3_pulsar.yaml` | **Смена вектора** | Волны атак с паузами |
 | `s4_camouflage.yaml` | **Смена вектора** | Dictionary → + junk сверху |
-| `s5_slow_drift.yaml` | **Смена вектора** | Плавный рост интенсивности |
+| `s5_hysteresis.yaml` | **Смена вектора** | Проверка работы гистерезиса |
 | `s6_multiwave.yaml` | **Смена вектора** | 3 разных вектора последовательно |
 
 ## Метрики Prometheus
